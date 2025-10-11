@@ -23,7 +23,7 @@ The HST fly star reduction pipeline depends on a certain directory structure.
 
 fcode_dir = '/Users/tmbhadra/Documents/Work/NASA/moira'
 
-def copy_files(source, destination, extensions=["_.fits"]):
+def copy_files(source, destination, extensions=[".fits"]):
     """
     Copy files from one folder to another.
     """
@@ -33,7 +33,7 @@ def copy_files(source, destination, extensions=["_.fits"]):
     for f in os.listdir(source):
         path = os.path.join(source, f)
         if os.path.isfile(path) and (any(f.endswith(e) for e in extensions)):
-            shutil.copy2(source, os.path.join(destination, f))
+            shutil.copy2(source / f, os.path.join(destination, f))
 
 def run_xgf_conversion(directory, script='run_convert_C1K1C.src'):
     """
@@ -100,7 +100,6 @@ def data_prep(directory):
 
     base_dir = Path(directory).resolve()
 
-    base_dir_one = base_dir / '00.DATA'
 
     filters = ['F814W', 'F606W']
 
@@ -112,8 +111,9 @@ def data_prep(directory):
         in_xym2mat_1 = 'IN.xym2mat.1'
         in_xym2mat_2 = 'IN.xym2mat.2'
 
+        base_dir_one = base_dir / '01.XYM'/ f
+        files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])
 
-        files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('_WJ2.fits')])
         output_file_dir = base_dir / '01.XYM' / f
 
         output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
@@ -125,38 +125,41 @@ def data_prep(directory):
         
 
         with open(output_file_img2sam, "w") as f:
-            for i in filename in enumerate(files, start=1):
+            for i, filename in enumerate(files, start=1):
                 if f == 'F606W':
                     f.write(f"{i:02d} \"{filename}\" 6 0\n")
                 else:
                     f.write(f"{i:02d} \"{filename}\" 8 0\n")
 
         with open(output_file_xym2bar1, "w") as f:
-            for i in filename in enumerate(files, start=1):
-                if f == 'F606W':
-                    f.write("00 MATCHUP.F814W.XYM.02\n")
-                    f.write(f"{i:02d} \"{filename}\" c8 f8 z0\n")
-                else:
-                    f.write(f"{i:02d} \"{filename}\" c8 f8 z0\n")
-
-        with open(output_file_xym2bar2, "w") as f:
-            for i in filename in enumerate(files, start=1):
+            if f == 'F606W':
+                f.write("00 MATCHUP.F814W.XYM.02\n")
+                for i, filename in enumerate(files, start=1):
+                    f.write(f"{i:02d} {filename} c8 f8 z0\n")
+            else:
                 f.write(f"{i:02d} \"{filename}\" c8 f8 z0\n")
 
-        with open(output_file_xym2mat1, "w") as f:
-            for i in filename in enumerate(files, start=1):
-                if f == 'F606W':
-                    f.write("00 MATCHUP.XYM.02 c0\n")
-                    f.write(f"{i:02d} \"{filename}\" c8 f6 \"m-14.75,-5.5\" \n")
-                else:
-                    f.write("00 MATCHUP.XYM.01 c0\n")
-                    f.write(f"{i:02d} \"{filename}\" c8 f8 \"m-13.75,-8.5\" \n")
+        with open(output_file_xym2bar2, "w") as f:
+            for i, filename in enumerate(files, start=1):
+                f.write(f"{i:02d} {filename} c8 f8 z0\n")
 
+        with open(output_file_xym2mat1, "w") as f:
+            if f == 'F606W':
+                f.write("#00 MATCHUP.XYM.02 c0\n")
+            else:
+                 f.write("#00 MATCHUP.XYM.01 c0\n")
+            for i, filename in enumerate(files, start=1):
+                if f == 'F606W':
+                    f.write(f"{i:02d} {filename} c8 f6 \"m-14.75,-5.5\" \n")
+                else:
+                    #if i == 1:
+                        #f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
+                    f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
 
         with open(output_file_xym2mat2, "w") as f:
-            for i in filename in enumerate(files, start=1):
-                f.write("00 MATCHUP.XYM.01 c0\n")
-                f.write(f"{i:02d} \"{filename}\" c8 f8 \"m-13.75,-8.5\" \n")
+            f.write("00 MATCHUP.XYM.01 c0\n")
+            for i, filename in enumerate(files, start=1):
+                f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
 
 
 
@@ -177,6 +180,7 @@ def matchup_files(directory):
     -------
     MATCHUP.XYM files
     """
+    #data_prep(directory)
     def run_img2xym(directory, script='run_img2xym_wfc3uv.src'):
 
         """
@@ -194,14 +198,12 @@ def matchup_files(directory):
             else:
                 script_path = base_dir/"F606W"/script
 
-            print(base_dir)
-            print(script_path)
-
             subprocess.run(
                 ["csh", str(script_path)],  # assumes csh script
                 cwd=subdir,
                 check=False
             )
+            print("Done", f)
     
     def run_xym2mat(directory, script='run_xym2mat_1.src'):
         """
@@ -209,13 +211,14 @@ def matchup_files(directory):
         """
         base_dir = Path(directory).resolve()/"01.XYM"
 
-        filters = ["F814W", "F606W"]
+        filters = ['F814W', 'F606W']
 
         for f in filters:
             subdir = base_dir / f
             if f == "F814W":
                 script_path = base_dir/"F814W"/script
             else:
+                script = 'run_xym2mat_VI.src'
                 script_path = base_dir/"F606W"/script
 
             print(base_dir)
@@ -226,6 +229,10 @@ def matchup_files(directory):
                 cwd=subdir,
                 check=False
             )
+
+            if f == "F814W":
+                copy_files(base_dir/"F814W", base_dir/"F606W", extensions=[".XYMEEE"])
+                copy_files(base_dir/"F814W", base_dir/"F606W", extensions=[".02"])
 
     def run_xym2bar(directory, script='run_xym2bar_1.src'):
         """
@@ -240,6 +247,7 @@ def matchup_files(directory):
             if f == "F814W":
                 script_path = base_dir/"F814W"/script
             else:
+                script = 'run_xym2bar.src'
                 script_path = base_dir/"F606W"/script
 
             print(base_dir)
@@ -251,6 +259,8 @@ def matchup_files(directory):
                 check=False
             )
 
+    #copy_files(source = Path(directory).resolve()/"00.DATA"/"F814W", destination = Path(directory).resolve()/"01.XYM"/"F814W")
+    #copy_files(source = Path(directory).resolve()/"00.DATA"/"F606W", destination = Path(directory).resolve()/"01.XYM"/"F606W")
 
 
      #run img2xym 
@@ -388,8 +398,8 @@ def loc_trans(directory):
                 check=False
             )
 
-    copy_files(source = Path(directory).resolve()/"02.XYM"/"F814W", Path(directory).resolve()/"03.LOC_TRANS_final"/"F814W")
-    copy_files(source = Path(directory).resolve()/"02.XYM"/"F606W", Path(directory).resolve()/"03.LOC_TRANS_final"/"F606W")
+    copy_files(source = Path(directory).resolve()/"02.XYM"/"F814W", destination = Path(directory).resolve()/"03.LOC_TRANS_final"/"F814W")
+    copy_files(source = Path(directory).resolve()/"02.XYM"/"F606W", destination = Path(directory).resolve()/"03.LOC_TRANS_final"/"F606W")
     run_xym2mat(directory)
     run_img2extract_wfc3uv_psflist(directory)
     run_img2extract_wfc3uv_psflist_Cal(directory)
