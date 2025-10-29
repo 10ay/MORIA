@@ -11,6 +11,7 @@ import subprocess
 from datetime import datetime as dt
 import pandas as pd
 import shutil
+import sys
 
 
 """
@@ -169,139 +170,138 @@ def data_prep(directory):
 def matchup_files(directory):
     """
     Run the scripts to create MATCHUP Files on _WJ2 files in F814W and F606W subdirectories.
-    Parameters
-    ----------
-    directory - The root directory to operate on. There is a specific directory
-    structure that is expected within <dir>:
-        00.DATA/
-        01.XYM/
-
-    Returns
-    -------
-    MATCHUP.XYM files
     """
-    #data_prep(directory)
-    def run_img2xym(directory, script='run_img2xym_wfc3uv.src'):
 
+    def run_img2xym(directory, script='run_img2xym_wfc3uv.src'):
         """
         Run img2xym_wfc3uv on exposures in the F814W subdirectory.
         Produces .XYM files for each exposure using the PSFEFF_WFC3UV_F814W_C0.fits library PSF.
         """
-        base_dir = Path(directory).resolve()/"01.XYM"
+        log_file = Path(directory).resolve() /'"run_img2xym_wfc3uv.log'
+        with open(log_file, "w") as logf:
+            sys.stdout = sys.stderr = logf
+            try:
+                base_dir = Path(directory).resolve() / "01.XYM"
+                filters = ['F814W', 'F606W']
 
-        filters = ['F814W', 'F606W']
+                for f in filters:
+                    subdir = base_dir / f
+                    script_path = subdir / script if f == "F814W" else subdir / script
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+                    print("Done", f)
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
 
-        for f in filters:
-            subdir = base_dir / f
-            if f == "F814W":
-                script_path = base_dir/"F814W"/script
-            else:
-                script_path = base_dir/"F606W"/script
+        print(f"Finished run_img2xym_wfc3uv")
 
-            subprocess.run(
-                ["csh", str(script_path)],  # assumes csh script
-                cwd=subdir,
-                check=False
-            )
-            print("Done", f)
-    
     def run_xym2mat(directory, script='run_xym2mat_1.src'):
         """
         Produces TRANS.xym2mat, as well as 16 MAT.0 files.
         """
-        base_dir = Path(directory).resolve()/"01.XYM"
+        log_file = Path(directory).resolve() / f'run_xym2mat_{script.replace('.src','')}.log'
 
-        filters = ['F814W', 'F606W']
+        with open(log_file, "w") as logf:
+            sys.stdout = sys.stderr = logf
+            try:
+                base_dir = Path(directory).resolve() / "01.XYM"
+                filters = ['F814W', 'F606W']
 
-        for f in filters:
-            subdir = base_dir / f
-            if f == "F814W":
-                script_path = base_dir/"F814W"/script
-            else:
-                script = 'run_xym2mat_VI.src'
-                script_path = base_dir/"F606W"/script
+                for f in filters:
+                    subdir = base_dir / f
+                    script_to_use = script if f == 'F814W' else 'run_xym2mat_VI.src'
+                    script_path = subdir / script_to_use
 
-            print(base_dir)
-            print(script_path)
+                    print(base_dir)
+                    print(script_path)
 
-            subprocess.run(
-                ["csh", str(script_path)],  # assumes csh script
-                cwd=subdir,
-                check=False
-            )
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+                    if f == "F814W":
+                        copy_files(base_dir / "F814W", base_dir / "F606W", extensions=[".XYMEEE"])
+                        copy_files(base_dir / "F814W", base_dir / "F606W", extensions=[".02"])
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
 
-            if f == "F814W":
-                copy_files(base_dir/"F814W", base_dir/"F606W", extensions=[".XYMEEE"])
-                copy_files(base_dir/"F814W", base_dir/"F606W", extensions=[".02"])
+        print(f"Finished run_xym2mat")
 
     def run_xym2bar(directory, script='run_xym2bar_1.src'):
         """
         Get a final list of photometry that allowed small zeropoint shifts for each exposure
         """
-        base_dir = Path(directory).resolve()/"01.XYM"
+        log_file = Path(directory).resolve() / f'run_xym2bar_{script.replace('.src','')}.log'
 
-        filters = ['F814W', 'F606W']
+        with open(log_file, "w") as logf:
+            sys.stdout = sys.stderr = logf
+            try:
+                base_dir = Path(directory).resolve() / "01.XYM"
+                filters = ['F814W', 'F606W']
 
-        for f in filters:
-            subdir = base_dir / f
-            if f == "F814W":
-                script_path = base_dir/"F814W"/script
-            else:
-                script = 'run_xym2bar.src'
-                script_path = base_dir/"F606W"/script
+                for f in filters:
+                    subdir = base_dir / f
+                    script_to_use = script if f == 'F814W' else 'run_xym2bar.src'
+                    script_path = subdir / script_to_use
 
-            print(base_dir)
-            print(script_path)
+                    print(base_dir)
+                    print(script_path)
 
-            subprocess.run(
-                ["csh", str(script_path)],  # assumes csh script
-                cwd=subdir,
-                check=False
-            )
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_xym2bar")
 
-    #copy_files(source = Path(directory).resolve()/"00.DATA"/"F814W", destination = Path(directory).resolve()/"01.XYM"/"F814W")
-    #copy_files(source = Path(directory).resolve()/"00.DATA"/"F606W", destination = Path(directory).resolve()/"01.XYM"/"F606W")
-
-
-     #run img2xym 
     run_img2xym(directory)
-
-     #run_xym2mat
     run_xym2mat(directory)
-
-     #run_xym2bar
     run_xym2bar(directory)
+    run_xym2mat(directory, script='run_xym2mat_2.src')
+    run_xym2bar(directory, script='run_xym2bar_2.src')
 
-     #run_xym2mat
-    run_xym2mat(directory, script = 'run_xym2mat_2.src')
-
-     #run_xym2bar
-    run_xym2bar(directory, script = 'run_xym2bar_2.src')
 
 def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
-        """
-        create a stack of the scene in the reference frame.
-        """
-        base_dir = Path(directory).resolve()/"01.XYM"
+    """
+    Create a stack of the scene in the reference frame.
+    """
 
-        filters = ['F814W', 'F606W']
+    base_dir = Path(directory).resolve() / "01.XYM"
+    filters = ['F814W', 'F606W']
 
-        for f in filters:
-            subdir = base_dir / f
-            if f == "F814W":
-                script_path = base_dir/"F814W"/script
-            else:
-                script_path = base_dir/"F606W"/script
+    for f in filters:
+        subdir = base_dir / f
+        script_path = subdir / script if f == "F814W" else subdir / script
 
-            print(base_dir)
-            print(script_path)
+        print(base_dir)
+        print(script_path)
 
-            subprocess.run(
-                ["csh", str(script_path)],  # assumes csh script
-                cwd=subdir,
-                check=False
-            )
-
+        subprocess.run(
+            ["csh", str(script_path)],  # assumes csh script
+            cwd=subdir,
+            text=True,
+            check=False
+        )
+        
+    print(f"Created output stacks")
 
 def loc_trans(directory):
     """
