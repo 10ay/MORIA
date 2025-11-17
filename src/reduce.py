@@ -109,15 +109,22 @@ def data_prep(directory):
         in_img2sam_wfc3uv = 'IN.img2sam_wfc3uv'
         in_xym2bar_1 = 'IN.xym2bar.1'
         in_xym2bar_2 = 'IN.xym2bar.2'
+        in_xym2mat = 'IN.xym2mat'
+        in_xym2bar = 'IN.xym2bar'
         in_xym2mat_1 = 'IN.xym2mat.1'
         in_xym2mat_2 = 'IN.xym2mat.2'
 
         base_dir_one = base_dir / '01.XYM'/ f
         files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])
+        files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.fits')])
 
+        
         output_file_dir = base_dir / '01.XYM' / f
 
         output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
+
+        output_file_xym2mat = os.path.join(output_file_dir, in_xym2mat)
+        output_file_xym2bar = os.path.join(output_file_dir, in_xym2bar)
         output_file_xym2mat1 = os.path.join(output_file_dir, in_xym2mat_1)
         output_file_xym2mat2 = os.path.join(output_file_dir, in_xym2mat_2)
         output_file_xym2bar1 = os.path.join(output_file_dir, in_xym2bar_1)
@@ -125,46 +132,50 @@ def data_prep(directory):
 
         
 
-        with open(output_file_img2sam, "w") as f:
+        with open(output_file_xym2mat1, "w") as f:
+            f.write("#00 MATCHUP.XYM.01 c0\n")
             for i, filename in enumerate(files, start=1):
-                if f == 'F606W':
-                    f.write(f"{i:02d} \"{filename}\" 6 0\n")
-                else:
-                    f.write(f"{i:02d} \"{filename}\" 8 0\n")
+                if i == 1:
+                    f.write(f"{0:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
+                f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
 
-        with open(output_file_xym2bar1, "w") as f:
-            if f == 'F606W':
-                f.write("00 MATCHUP.F814W.XYM.02\n")
+        
+        with open(output_file_xym2mat, "w") as f:
+            f.write("00 MATCHUP.F814W.XYM.02 c0\n")
+            for i, filename in enumerate(files, start=1):
+                f.write(f"{i:02d} {filename} c8 f6 \"m-14.75,-5.5\" \n")
+
+
+        if f == 'F814W':
+            with open(output_file_xym2bar1, "w") as f:
                 for i, filename in enumerate(files, start=1):
                     f.write(f"{i:02d} {filename} c8 f8 z0\n")
-            else:
-                f.write(f"{i:02d} \"{filename}\" c8 f8 z0\n")
+        else:
+             with open(output_file_xym2bar, "w") as f:
+                f.write("00 MATCHUP.F814W.XYM.02 c0\n")
+                for i, filename in enumerate(files, start=1):
+                    f.write(f"{i:02d} {filename} c8 f6\n")
+
+        if f == "F814W":
+            with open(output_file_img2sam, "w") as t:
+                for i, filename in enumerate(files_two, start=1):
+                    print(filename)
+                    t.write(f"{i:02d} \"{filename}\" 8 0\n")
+        else:
+            with open(output_file_img2sam, "w") as t:
+                for i, filename in enumerate(files_two, start=1):
+                    t.write(f"{i:02d} \"{filename}\" 6 0\n")
+        
+                
 
         with open(output_file_xym2bar2, "w") as f:
             for i, filename in enumerate(files, start=1):
                 f.write(f"{i:02d} {filename} c8 f8 z0\n")
 
-        with open(output_file_xym2mat1, "w") as f:
-            if f == 'F606W':
-                f.write("#00 MATCHUP.XYM.02 c0\n")
-            else:
-                 f.write("#00 MATCHUP.XYM.01 c0\n")
-            for i, filename in enumerate(files, start=1):
-                if f == 'F606W':
-                    f.write(f"{i:02d} {filename} c8 f6 \"m-14.75,-5.5\" \n")
-                else:
-                    #if i == 1:
-                        #f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
-                    f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
-
         with open(output_file_xym2mat2, "w") as f:
             f.write("00 MATCHUP.XYM.01 c0\n")
             for i, filename in enumerate(files, start=1):
                 f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
-
-
-
-
     return
 
 def matchup_files(directory):
@@ -201,8 +212,9 @@ def matchup_files(directory):
                 sys.stderr = sys.__stderr__
 
         print(f"Finished run_img2xym_wfc3uv")
+        
 
-    def run_xym2mat(directory, script='run_xym2mat_1.src'):
+    def run_xym2mat(directory, filters = ['F814W'], script='run_xym2mat_1.src'):
         """
         Produces TRANS.xym2mat, as well as 16 MAT.0 files.
         """
@@ -212,7 +224,6 @@ def matchup_files(directory):
             sys.stdout = sys.stderr = logf
             try:
                 base_dir = Path(directory).resolve() / "01.XYM"
-                filters = ['F814W', 'F606W']
 
                 for f in filters:
                     subdir = base_dir / f
@@ -230,16 +241,15 @@ def matchup_files(directory):
                         text=True,
                         check=False
                     )
-                    if f == "F814W":
-                        copy_files(base_dir / "F814W", base_dir / "F606W", extensions=[".XYMEEE"])
-                        copy_files(base_dir / "F814W", base_dir / "F606W", extensions=[".02"])
+                    
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
 
         print(f"Finished run_xym2mat")
+        
 
-    def run_xym2bar(directory, script='run_xym2bar_1.src'):
+    def run_xym2bar(directory, filters = ['F814W'], script='run_xym2bar_1.src'):
         """
         Get a final list of photometry that allowed small zeropoint shifts for each exposure
         """
@@ -249,7 +259,7 @@ def matchup_files(directory):
             sys.stdout = sys.stderr = logf
             try:
                 base_dir = Path(directory).resolve() / "01.XYM"
-                filters = ['F814W', 'F606W']
+                
 
                 for f in filters:
                     subdir = base_dir / f
@@ -272,11 +282,21 @@ def matchup_files(directory):
                 sys.stderr = sys.__stderr__
         print(f"Finished run_xym2bar")
 
+    print(directory)
+    copy_files(source=Path(directory).resolve() / "00.DATA" / "F814W", destination=Path(directory).resolve() / "01.XYM" / "F814W", extensions=[".fits"])
+    copy_files(source=Path(directory).resolve() / "00.DATA" / "F606W", destination=Path(directory).resolve() / "01.XYM" / "F606W", extensions=[".fits"])
     run_img2xym(directory)
     run_xym2mat(directory)
     run_xym2bar(directory)
     run_xym2mat(directory, script='run_xym2mat_2.src')
     run_xym2bar(directory, script='run_xym2bar_2.src')
+    copy_files(source=Path(directory).resolve() / "01.XYM" / "F814W", destination=Path(directory).resolve() / "01.XYM" / "F606W", extensions=[".02"])
+    run_xym2mat(directory, filters = ['F606W'])
+    run_xym2bar(directory, filters = ['F606W'])
+
+
+    #copy files
+    #Repeat for F606W
 
 
 def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
@@ -303,12 +323,9 @@ def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
         
     print(f"Created output stacks")
 
-def loc_trans(directory):
+def data_prep_loc_trans(directory, filters = 'F814W'):
     """
-    Run the local transformation scripts in F814W and F606W subdirectories to extract 
-    the pixels from each exposure and accurately transform their locations into the 
-    reference frame so that we can use them to solve for a PSF and then use this PSF to model the target star.
-
+    Preparae IN.* files in respective files using _WJ2.fits files in 00.DATA
     Parameters
     ----------
     directory - The root directory to operate on. There is a specific directory
@@ -318,92 +335,426 @@ def loc_trans(directory):
 
     Returns
     -------
-    Pixels for PSF generation
+    several IN.* files.
     """
-    copy_files(source, destination, extensions=[".xym"])
+
+    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "03.LOC_TRANS" / filters)
+    copy_files(source=Path(directory).resolve() / "01.XYM" / filters, extensions=[".xym"], destination=Path(directory).resolve() / "03.LOC_TRANS" / filters)
+    copy_files(source=Path(directory).resolve() / "01.XYM" / filters, extensions=[".fits"], destination=Path(directory).resolve() / "03.LOC_TRANS" / filters)
+
+    base_dir = Path(directory).resolve()
+
+    subdir = base_dir / filters
+    in_img2sam_wfc3uv = 'IN.img2sam_wfc3uv'
+    in_xym2mat = 'IN.xym2mat'
+
+    base_dir_one = base_dir / '01.XYM'/ filters
+    f=filters
+    files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])    
+    files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.fits')])    
+    output_file_dir = base_dir / '03.LOC_TRANS' / f
+
+    output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
+    output_file_xym2mat = os.path.join(output_file_dir, in_xym2mat)
+    if filters == 'F814W':
+        with open(output_file_xym2mat, "w") as f:
+            f.write("00 NEARBY_REF_STARS.XYIVB_targ c0\n")
+            for i, filename in enumerate(files, start=1):
+                f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
+    
+        with open(output_file_img2sam, "w") as t:
+            for i, filename in enumerate(files_two, start=1):
+                t.write(f"{i:02d} \"{filename}\" 8 0\n")
+    else:
+        with open(output_file_xym2mat, "w") as f:
+            f.write("00 NEARBY_REF_STARS.XYIVB_targ c0\n")
+            for i, filename in enumerate(files, start=1):
+                f.write(f"{i:02d} {filename} c8 f8 \"m-14.75,-5.5\" \n")
+    
+        with open(output_file_img2sam, "w") as t:
+            for i, filename in enumerate(files_two, start=1):
+                t.write(f"{i:02d} \"{filename}\" 6 0\n")
+            
+    return
+
+def loc_trans(directory):
+    """
+    Run the local transformation scripts in F814W and F606W subdirectories to extract 
+    the pixels from each exposure and accurately transform their locations into the 
+    reference frame so that we can use them to solve for a PSF and then use this PSF to model the target star.
+
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory containing 00.DATA/ and 01.XYM/ folders.
+
+    Returns
+    -------
+    Produces pixel data for PSF generation.
+    """
 
     def run_xym2mat(directory, script='run_xym2mat.src'):
-        """
-        Produces TRANS.xym2mat, as well as 16 MAT.0 files.
-        """
-        base_dir = Path(directory).resolve()/"03.LOC_TRANS_final"
-
-        filters = ['F814W', 'F606W']
-
-        for f in filters:
-            subdir = base_dir / f
-            if f == "F814W":
-                script_path = base_dir/"F814W"/script
-            else:
-                script_path = base_dir/"F606W"/script
-
-            print(base_dir)
-            print(script_path)
-
-            subprocess.run(
-                ["csh", str(script_path)],  # assumes csh script
-                cwd=subdir,
-                check=False
-            )
+        """Produces TRANS.xym2mat, as well as 16 MAT.0 files."""
+        log_file = Path(directory).resolve() / f"loc_trans_run_xym2mat_{script.replace('.src','')}.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "03.LOC_TRANS"
+                filters = ['F814W', 'F606W']
+                for f in filters:
+                    subdir = base_dir / f
+                    script_path = subdir / script if f == "F814W" else base_dir / "F606W" / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_xym2mat.src")
 
     def run_img2extract_wfc3uv_psflist(directory):
-        """
-        Produces TRANS.xym2mat, as well as 16 MAT.0 files.
-        """
-        base_dir = Path(directory).resolve()/"03.LOC_TRANS_final"
-
-        filters = ['F814W', 'F606W']
-
-        for f in filters:
-            subdir = base_dir / f
-            if f == "F814W":
-                script = 'run_img2extract_wfc3uv_psflist_simst.src'
-                script_path = base_dir/"F814W"/script
-            else:
-                script = 'run_img2extract_wfc3uv_psflist_simstV.src'
-                script_path = base_dir/"F606W"/script
-
-            print(base_dir)
-            print(script_path)
-
-            subprocess.run(
-                ["csh", str(script_path)],  # assumes csh script
-                cwd=subdir,
-                check=False
-            )
+        """Run extraction for PSF list generation (simulation)."""
+        log_file = Path(directory).resolve() / f"loc_trans_run_img2extract_wfc3uv_psflist.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "03.LOC_TRANS"
+                filters = ['F814W', 'F606W']
+                for f in filters:
+                    subdir = base_dir / f
+                    script = 'run_img2extract_wfc3uv_psflist_simst.src' if f == "F814W" else 'run_img2extract_wfc3uv_psflist_simstV.src'
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_img2extract_wfc3uv_psflist")
 
     def run_img2extract_wfc3uv_psflist_Cal(directory):
-        """
-        Produces TRANS.xym2mat, as well as 16 MAT.0 files.
-        """
-        base_dir = Path(directory).resolve()/"03.LOC_TRANS_final"
+        """Run extraction for PSF list generation (calibration)."""
 
-        filters = ['F814W', 'F606W']
+        log_file = Path(directory).resolve() / f"loc_trans_run_img2extract_wfc3uv_psflist_Cal.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "03.LOC_TRANS"
+                filters = ['F814W', 'F606W']
+                for f in filters:
+                    subdir = base_dir / f
+                    script = 'run_img2extract_wfc3uv_psflist_Cal.src' if f == "F814W" else 'run_img2extract_wfc3uv_psflist_CalV.src'
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_img2extract_wfc3uv_psflist_Cal")
 
-        for f in filters:
-            subdir = base_dir / f
-            if f == "F814W":
-                script = 'run_img2extract_wfc3uv_psflist_Cal.src'
-                script_path = base_dir/"F814W"/script
-            else:
-                script = 'run_img2extract_wfc3uv_psflist_CalV.src'
-                script_path = base_dir/"F606W"/script
 
-            print(base_dir)
-            print(script_path)
-
-            subprocess.run(
-                ["csh", str(script_path)],  # assumes csh script
-                cwd=subdir,
-                check=False
-            )
-
-    copy_files(source = Path(directory).resolve()/"02.XYM"/"F814W", destination = Path(directory).resolve()/"03.LOC_TRANS_final"/"F814W")
-    copy_files(source = Path(directory).resolve()/"02.XYM"/"F606W", destination = Path(directory).resolve()/"03.LOC_TRANS_final"/"F606W")
+    print(directory)
+    data_prep_loc_trans(directory)
+    data_prep_loc_trans(directory, filters = 'F606W')
     run_xym2mat(directory)
     run_img2extract_wfc3uv_psflist(directory)
     run_img2extract_wfc3uv_psflist_Cal(directory)
-    
+
+
+
+def extract_psf_1(directory):
+    """
+    Generate a local PSF for each filter, using the stars that are similar in magnitude and color to the target star. The magnitude similarity is thought to be important because the CTE losses are expected to make PSF shapes magnitude dependent. 
+    The initial selection of PSF stars in directory 02.CMD_final did not take into account any blending. 
+
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory containing 00.DATA/ and 01.XYM/ folders.
+
+    Returns
+    -------
+    Local PSF for each filter
+    """
+
+    def run_uvp2psf_simst(directory, iteration = 1, script='run_uvp2psf_simst_1.src'):
+        """Finds a sky value for each star in each exposure using the pixels between 8.5 and 13.5 pixels of the center."""
+        log_file = Path(directory).resolve() / f"run_uvp2psf_simst_1.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "04.EXTRACT_PSF"
+                filters = ['F814W', 'F606W']
+                for f in filters:
+                    subdir = base_dir / f
+                    script = 'run_uvp2psf_simst_1.src' if f == "F814W" else 'run_uvp2psf_simstV_1.src'
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_uvp2psf_simst_1")
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W")
+    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W")
+    run_uvp2psf_simst(directory)
+        
+def extract_psf_2(directory):
+    """
+    Generate a local PSF for each filter, using the stars that are similar in magnitude and color to the target star. The magnitude similarity is thought to be important because the CTE losses are expected to make PSF shapes magnitude dependent. 
+
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory containing 00.DATA/ and 01.XYM/ folders.
+
+    Returns
+    -------
+    Local PSF for each filter
+    """
+
+    def run_uvp2psf_simst(directory, script='run_uvp2psf_simst_1.src'):
+        """Finds a sky value for each star in each exposure using the pixels between 8.5 and 13.5 pixels of the center."""
+        log_file = Path(directory).resolve() / f"run_uvp2psf_simst_1.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "04.EXTRACT_PSF"
+                filters = ['F814W', 'F606W']
+                for f in filters:
+                    subdir = base_dir / f
+                    script = 'run_uvp2psf_simst_2.src' if f == "F814W" else 'run_uvp2psf_simstV_2.src'
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_uvp2psf_simst_2")
+        
+    run_uvp2psf_simst(directory)
+
+
+
+def tri_fit_final_F814W(directory):
+    """
+    Fit the pixels of the target star with the PSF to determine the best-fit 2 or 3-star model in the F814W filter. 
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory containing 00.DATA/ and 01.XYM/ folders.
+
+    Returns
+    -------
+    Local PSF for each filter
+    """
+
+    def run_uvp2psf_simst_1(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
+        log_file = Path(directory).resolve() / f"uvp2tri_scon_fs_asym_mcmc.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
+                folders = ['1star-fit', '2star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script = script
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_uvp2psf_simst_1")
+
+    def run_uvp2psf_simst_2(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
+        log_file = Path(directory).resolve() / f"uvp2tri_scon_fs_asym_mcmc.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
+                folders = ['1star-fit', '2star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_uvp2psf_simst_1")
+        
+    def run_mcmc_expand_average_814W(directory, script='run_mcmc_expand_average.src'):
+        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
+                folders = ['1star-fit', '2star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_mcmc_expand_average")
+        
+    def run_mcmc_expand_average_606W(directory, script='run_mcmc_expand_average.src'):
+        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
+                folders = ['1star-fit', '2star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_mcmc_expand_average")
+        
+    run_uvp2psf_simst_1(directory)
+    #run_uvp2psf_simst_2(directory)
+    run_mcmc_expand_average_814W(directory)
+    #run_mcmc_expand_average_606W(directory)
+
+
+
+
+def tri_fit_final_606W(directory):
+    """
+    Fit the pixels of the target star with the PSF to determine the best-fit 2 or 3-star model in the 606W filter. 
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory containing 00.DATA/ and 01.XYM/ folders.
+
+    Returns
+    -------
+    Local PSF for each filter
+    """
+
+    def run_uvp2psf_simst_2(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
+        log_file = Path(directory).resolve() / f"uvp2tri_scon_fs_asym_mcmc.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
+                folders = ['1star-fit', '2star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_uvp2psf_simst_1")
+        
+    def run_mcmc_expand_average_606W(directory, script='run_mcmc_expand_average.src'):
+        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
+                folders = ['1star-fit', '2star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_mcmc_expand_average")
+        
+    run_uvp2psf_simst_2(directory)
+    #run_uvp2psf_simst_2(directory)
+    run_mcmc_expand_average_606W(directory)
+    #run_mcmc_expand_average_606W(directory)
+
 
     
     
