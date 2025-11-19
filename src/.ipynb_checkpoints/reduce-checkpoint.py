@@ -36,9 +36,9 @@ def copy_files(source, destination, extensions=[".fits"]):
         if os.path.isfile(path) and (any(f.endswith(e) for e in extensions)):
             shutil.copy2(source / f, os.path.join(destination, f))
 
-def data_prep(source, destination):
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=["*_convert_C1K1C.xgf"])
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=["*_convert_C1K1C.xgf"])
+def data_prep_early(source, destination):
+    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=["*.xgf"])
+    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=[".xgf"])
     copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "01.XYM" / "F814W", extensions=[".xgf"])
     copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "01.XYM" / "F606W", extensions=[".xgf"])
 
@@ -105,13 +105,10 @@ def data_prep(directory):
     -------
     several IN.* files.
     """
-
-    base_dir = Path(directory).resolve()
-
-
-    filters = ['F814W', 'F606W']
-
-    for f in filters:
+    
+        
+    def data_prep_F814W(directory, f= 'F814W'):
+        base_dir = Path(directory).resolve()
         subdir = base_dir / f
         in_img2sam_wfc3uv = 'IN.img2sam_wfc3uv'
         in_xym2bar_1 = 'IN.xym2bar.1'
@@ -121,15 +118,13 @@ def data_prep(directory):
         in_xym2mat_1 = 'IN.xym2mat.1'
         in_xym2mat_2 = 'IN.xym2mat.2'
 
-        base_dir_one = base_dir / '01.XYM'/ f
+        base_dir_one = base_dir / '00.DATA'/ f
         files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])
         files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.fits')])
 
         
         output_file_dir = base_dir / '01.XYM' / f
-
         output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
-
         output_file_xym2mat = os.path.join(output_file_dir, in_xym2mat)
         output_file_xym2bar = os.path.join(output_file_dir, in_xym2bar)
         output_file_xym2mat1 = os.path.join(output_file_dir, in_xym2mat_1)
@@ -146,34 +141,15 @@ def data_prep(directory):
                     f.write(f"{0:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
                 f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
 
-        
-        with open(output_file_xym2mat, "w") as f:
-            f.write("00 MATCHUP.F814W.XYM.02 c0\n")
+
+        with open(output_file_xym2bar1, "w") as f:
             for i, filename in enumerate(files, start=1):
-                f.write(f"{i:02d} {filename} c8 f6 \"m-14.75,-5.5\" \n")
-
-
-        if f == 'F814W':
-            with open(output_file_xym2bar1, "w") as f:
-                for i, filename in enumerate(files, start=1):
-                    f.write(f"{i:02d} {filename} c8 f8 z0\n")
-        else:
-             with open(output_file_xym2bar, "w") as f:
-                f.write("00 MATCHUP.F814W.XYM.02 c0\n")
-                for i, filename in enumerate(files, start=1):
-                    f.write(f"{i:02d} {filename} c8 f6\n")
-
-        if f == "F814W":
-            with open(output_file_img2sam, "w") as t:
-                for i, filename in enumerate(files_two, start=1):
-                    print(filename)
-                    t.write(f"{i:02d} \"{filename}\" 8 0\n")
-        else:
-            with open(output_file_img2sam, "w") as t:
-                for i, filename in enumerate(files_two, start=1):
-                    t.write(f"{i:02d} \"{filename}\" 6 0\n")
-        
-                
+                f.write(f"{i:02d} {filename} c8 f8 z0\n")
+    
+        with open(output_file_img2sam, "w") as t:
+            for i, filename in enumerate(files_two, start=1):
+                print(filename)
+                t.write(f"{i:02d} \"{filename}\" 8 0\n")
 
         with open(output_file_xym2bar2, "w") as f:
             for i, filename in enumerate(files, start=1):
@@ -183,8 +159,48 @@ def data_prep(directory):
             f.write("00 MATCHUP.XYM.01 c0\n")
             for i, filename in enumerate(files, start=1):
                 f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
-    return
+        return
+    
+    
+    def data_prep_F606W(directory, f = "F606W"):
+        base_dir = Path(directory).resolve()
+        subdir = base_dir / f
+        in_img2sam_wfc3uv = 'IN.img2sam_wfc3uv'
+        in_xym2mat = 'IN.xym2mat'
+        in_xym2bar = 'IN.xym2bar'
 
+        base_dir_one = base_dir / '00.DATA'/ f
+        files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])
+        files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.fits')])
+
+        
+        output_file_dir = base_dir / '01.XYM' / f
+        output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
+        output_file_xym2mat = os.path.join(output_file_dir, in_xym2mat)
+        output_file_xym2bar = os.path.join(output_file_dir, in_xym2bar)
+        
+        with open(output_file_xym2mat, "w") as f:
+            f.write("00 MATCHUP.F814W.XYM.02 c0\n")
+            for i, filename in enumerate(files, start=1):
+                f.write(f"{i:02d} {filename} c8 f6 \"m-14.75,-5.5\" \n")
+
+
+        with open(output_file_xym2bar, "w") as f:
+            f.write("00 MATCHUP.F814W.XYM.02 c0\n")
+            for i, filename in enumerate(files, start=1):
+                f.write(f"{i:02d} {filename} c8 f6\n")
+
+
+        with open(output_file_img2sam, "w") as t:
+            for i, filename in enumerate(files_two, start=1):
+                t.write(f"{i:02d} \"{filename}\" 6 0\n")
+        
+                
+        return
+    
+    data_prep_F814W(directory)
+    data_prep_F606W(directory)
+    
 def matchup_files(directory):
     """
     Run the scripts to create MATCHUP Files on _WJ2 files in F814W and F606W subdirectories.
@@ -487,6 +503,18 @@ def loc_trans(directory):
     run_img2extract_wfc3uv_psflist_Cal(directory)
 
 
+def cmd_diagram(directory):
+    copy_files(source=Path(directory).resolve() / "01.XYM" / "F814W", destination=Path(directory).resolve() / "02.CMD", extensions=[".02"])
+    copy_files(source=Path(directory).resolve() / "01.XYM" / "F606W", destination=Path(directory).resolve() / "02.CMD", extensions=[".XYM"])
+    subdir = Path(directory).resolve() / "02.CMD"
+    script_path = Path(directory).resolve() / "02.CMD" / "cmd_plot.py"
+    subprocess.run(
+                    ["python", str(script_path)],
+                    cwd=subdir,
+                )
+
+
+    
 
 def extract_psf_1(directory):
     """
