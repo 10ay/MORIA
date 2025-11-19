@@ -1,0 +1,24 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     mcmc_expand_average.xgf
+relocations:
+  - { offset: 0x1A, size: 0x8, addend: 0x0, symName: _lenc_, symObjAddr: 0x0, symBinAddr: 0x100000670, symSize: 0x98 }
+  - { offset: 0x46, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x13E8, symBinAddr: 0x100001A58, symSize: 0x3C }
+  - { offset: 0x8E, size: 0x8, addend: 0x0, symName: _MAIN__, symObjAddr: 0x98, symBinAddr: 0x100000708, symSize: 0x1350 }
+  - { offset: 0xBD, size: 0x8, addend: 0x0, symName: _a0a.7, symObjAddr: 0x4940620, symBinAddr: 0x104946000, symSize: 0x0 }
+  - { offset: 0x112, size: 0x8, addend: 0x0, symName: _f1a.13, symObjAddr: 0x1251E20, symBinAddr: 0x101257800, symSize: 0x0 }
+  - { offset: 0x158, size: 0x8, addend: 0x0, symName: _f2a.10, symObjAddr: 0x2DC9220, symBinAddr: 0x102DCEC00, symSize: 0x0 }
+  - { offset: 0x19D, size: 0x8, addend: 0x0, symName: _flux1a.4, symObjAddr: 0x64B7A20, symBinAddr: 0x1064BD400, symSize: 0x0 }
+  - { offset: 0x1D3, size: 0x8, addend: 0x0, symName: _flux2a.3, symObjAddr: 0x6DDF620, symBinAddr: 0x106DE5000, symSize: 0x0 }
+  - { offset: 0x2B4, size: 0x8, addend: 0x0, symName: _x12flxwt.2, symObjAddr: 0x7707220, symBinAddr: 0x10770CC00, symSize: 0x0 }
+  - { offset: 0x2F9, size: 0x8, addend: 0x0, symName: _x1a.15, symObjAddr: 0x2620, symBinAddr: 0x100008000, symSize: 0x0 }
+  - { offset: 0x33F, size: 0x8, addend: 0x0, symName: _x2a.12, symObjAddr: 0x1B79A20, symBinAddr: 0x101B7F400, symSize: 0x0 }
+  - { offset: 0x365, size: 0x8, addend: 0x0, symName: _x2mx1a.6, symObjAddr: 0x5268220, symBinAddr: 0x10526DC00, symSize: 0x0 }
+  - { offset: 0x3BB, size: 0x8, addend: 0x0, symName: _x3a.9, symObjAddr: 0x36F0E20, symBinAddr: 0x1036F6800, symSize: 0x0 }
+  - { offset: 0x401, size: 0x8, addend: 0x0, symName: _y12flxwt.1, symObjAddr: 0x802EE20, symBinAddr: 0x108034800, symSize: 0x0 }
+  - { offset: 0x446, size: 0x8, addend: 0x0, symName: _y1a.14, symObjAddr: 0x92A220, symBinAddr: 0x10092FC00, symSize: 0x0 }
+  - { offset: 0x48C, size: 0x8, addend: 0x0, symName: _y2a.11, symObjAddr: 0x24A1620, symBinAddr: 0x1024A7000, symSize: 0x0 }
+  - { offset: 0x4B2, size: 0x8, addend: 0x0, symName: _y2my1a.5, symObjAddr: 0x5B8FE20, symBinAddr: 0x105B95800, symSize: 0x0 }
+  - { offset: 0x508, size: 0x8, addend: 0x0, symName: _y3a.8, symObjAddr: 0x4018A20, symBinAddr: 0x10401E400, symSize: 0x0 }
+  - { offset: 0x58E, size: 0x8, addend: 0x0, symName: _lenc_, symObjAddr: 0x0, symBinAddr: 0x100000670, symSize: 0x98 }
+...

@@ -1,0 +1,2 @@
+./img2sam_wfc3uv_379.xgf
+cp -p outputq.fits outputq_F606W.fits

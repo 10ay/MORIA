@@ -1,0 +1,7 @@
+cp -p IN.good_psf_list.2 IN.good_psf_list
+gunzip img2extract_wfc3uv_psflist_simst.uvp.gz
+./uvp2psf_simst.xOg < img2extract_wfc3uv_psflist_simst.uvp
+cp -p show_psf_simst.fits show_psf_simst2.fits
+cp -p psfout_simst.fits psfout_simst2.fits
+cp -p show_str_simst.fits show_str_simst2.fits
+gzip img2extract_wfc3uv_psflist_simst.uvp

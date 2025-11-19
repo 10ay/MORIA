@@ -1,0 +1,2 @@
+./img2extract_wfc3uv_psflist.xgf NEARBY_SIM_STARS.XYIVB_targ simst
+gzip img2extract_wfc3uv_psflist_simst.uvp

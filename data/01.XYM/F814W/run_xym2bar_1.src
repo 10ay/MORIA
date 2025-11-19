@@ -1,0 +1,3 @@
+cp -p IN.xym2bar.1 IN.xym2bar
+./xym2bar.xgf 8
+cp -p MATCHUP.XYMEEE MATCHUP.XYM.01

@@ -1,0 +1,3 @@
+gunzip img2extract_wfc3uv_psflist_simstV.uvp.gz
+./uvp2tri_scon_fs_asym_mcmc.xOg < IN.uvp2tri_NOscon_fs_asym_mcmc
+gzip img2extract_wfc3uv_psflist_simstV.uvp

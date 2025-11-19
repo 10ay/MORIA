@@ -1,0 +1,35 @@
+macro read show_cmd_targ.sm
+quit
+macro read show_cmd_targ.sm
+device pdf  show_cmd_targ.pdf
+device pdf show_cmd_targ.pdf
+device x11
+macro read show_cmd_targ.sm
+device pdf show_cmd_targ.pdf
+quit
+macro read show_cmd_targ.sm
+device pdf  show_cmd_targ.pdf
+device pdf show_cmd_Cal.pdf
+quit
+macro read show_cmd_targ.sm
+quit
+macro read show_cmd_targ.sm
+quit
+macro read_show_cmd_targ.sm
+macro read show_cmd_targ.sm
+quit
+macro read_show_cmd_targ.sm
+macro read show_cmd_targ.sm
+quit
+macro read show_cmd_targ.sm
+quit
+macro read show_cmd_targ.sm
+quit
+macro read show_cmd_targ.sm
+quit
+macro read show_cmd_targ.sm
+quit
+macro read show_cmd_targ.sm
+quit
+macro read show_cmd_targ.sm
+quit

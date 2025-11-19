@@ -1,0 +1,3 @@
+cp -p IN.xym2mat.2 IN.xym2mat
+./xym2mat.xgf 20
+cp -p  TRANS.xym2mat TRANS.xym2mat.2
