@@ -37,7 +37,7 @@ def copy_files(source, destination, extensions=[".fits"]):
             shutil.copy2(source / f, os.path.join(destination, f))
 
 def data_prep_early(source, destination):
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=["*.xgf"])
+    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xgf"])
     copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=[".xgf"])
     copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "01.XYM" / "F814W", extensions=[".xgf"])
     copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "01.XYM" / "F606W", extensions=[".xgf"])
@@ -82,7 +82,6 @@ def run_xgf_conversion(directory, script='run_convert_C1K1C.src'):
             continue
 
         # Run the script inside the subdir
-        print(subdir)
         subprocess.run(
             ['csh', str(script_path)],  # assumes csh script
             cwd=subdir,
@@ -148,7 +147,6 @@ def data_prep(directory):
     
         with open(output_file_img2sam, "w") as t:
             for i, filename in enumerate(files_two, start=1):
-                print(filename)
                 t.write(f"{i:02d} \"{filename}\" 8 0\n")
 
         with open(output_file_xym2bar2, "w") as f:
@@ -252,10 +250,6 @@ def matchup_files(directory):
                     subdir = base_dir / f
                     script_to_use = script if f == 'F814W' else 'run_xym2mat_VI.src'
                     script_path = subdir / script_to_use
-
-                    print(base_dir)
-                    print(script_path)
-
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -288,10 +282,6 @@ def matchup_files(directory):
                     subdir = base_dir / f
                     script_to_use = script if f == 'F814W' else 'run_xym2bar.src'
                     script_path = subdir / script_to_use
-
-                    print(base_dir)
-                    print(script_path)
-
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -305,7 +295,6 @@ def matchup_files(directory):
                 sys.stderr = sys.__stderr__
         print(f"Finished run_xym2bar")
 
-    print(directory)
     copy_files(source=Path(directory).resolve() / "00.DATA" / "F814W", destination=Path(directory).resolve() / "01.XYM" / "F814W", extensions=[".fits"])
     copy_files(source=Path(directory).resolve() / "00.DATA" / "F606W", destination=Path(directory).resolve() / "01.XYM" / "F606W", extensions=[".fits"])
     run_img2xym(directory)
@@ -328,23 +317,29 @@ def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
     Create a stack of the scene in the reference frame.
     """
 
-    base_dir = Path(directory).resolve() / "01.XYM"
-    filters = ['F814W', 'F606W']
+    log_file = Path(directory).resolve() / f'output_stack.log'
 
-    for f in filters:
-        subdir = base_dir / f
-        script_path = subdir / script if f == "F814W" else subdir / script
-
-        print(base_dir)
-        print(script_path)
-
-        subprocess.run(
-            ["csh", str(script_path)],  # assumes csh script
-            cwd=subdir,
-            text=True,
-            check=False
-        )
+    with open(log_file, "w") as logf:
+        sys.stdout = sys.stderr = logf
+        try:
+                
+            base_dir = Path(directory).resolve() / "01.XYM"
+            filters = ['F814W', 'F606W']
+            
         
+            for f in filters:
+                subdir = base_dir / f
+                script_path = subdir / script if f == "F814W" else subdir / script
+                
+                subprocess.run(
+                    ["csh", str(script_path)],  # assumes csh script
+                    cwd=subdir,
+                    text=True,
+                    check=False
+                )
+        finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__        
     print(f"Created output stacks")
 
 def data_prep_loc_trans(directory, filters = 'F814W'):
