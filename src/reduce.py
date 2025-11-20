@@ -118,7 +118,7 @@ def data_prep(directory):
         in_xym2mat_1 = 'IN.xym2mat.1'
         in_xym2mat_2 = 'IN.xym2mat.2'
 
-        base_dir_one = base_dir / '00.DATA'/ f
+        base_dir_one = base_dir / '01.XYM'/ f
         files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])
         files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.fits')])
 
@@ -169,7 +169,7 @@ def data_prep(directory):
         in_xym2mat = 'IN.xym2mat'
         in_xym2bar = 'IN.xym2bar'
 
-        base_dir_one = base_dir / '00.DATA'/ f
+        base_dir_one = base_dir / '01.XYM'/ f
         files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])
         files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.fits')])
 
@@ -309,6 +309,7 @@ def matchup_files(directory):
     copy_files(source=Path(directory).resolve() / "00.DATA" / "F814W", destination=Path(directory).resolve() / "01.XYM" / "F814W", extensions=[".fits"])
     copy_files(source=Path(directory).resolve() / "00.DATA" / "F606W", destination=Path(directory).resolve() / "01.XYM" / "F606W", extensions=[".fits"])
     run_img2xym(directory)
+    data_prep(directory)
     run_xym2mat(directory)
     run_xym2bar(directory)
     run_xym2mat(directory, script='run_xym2mat_2.src')

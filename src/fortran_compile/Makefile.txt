@@ -1,18 +1,22 @@
-#!/bin/bash
+# Fortran compiler
+F77 = gfortran-mp-14
 
-# Compile all .F files in the directory
-for src in *.F; do
-    # Skip if no files match
-    [ -e "$src" ] || continue
+# Flags
+OPT = -g
 
-    exe="${src%.F}.xgf"
-    echo "Compiling $src -> $exe"
-    gfortran-mp-14 -g "$src" -o "$exe"
+# All .F sources
+SRCS = $(wildcard *.F)
 
-    if [ $? -ne 0 ]; then
-        echo "❌ Error compiling $src"
-        exit 1
-    fi
-done
+# Convert program.F → program.xgf
+EXECUTABLES = $(SRCS:.F=.xgf)
 
-echo "✅ Done compiling all .F files."
+# Default: build all executables
+all: $(EXECUTABLES)
+
+# Rule: program.F → program.xgf
+%.xgf: %.F
+	$(F77) $(OPT) $< -o $@
+
+# Clean everything
+clean:
+	rm -f *.xgf
