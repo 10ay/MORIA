@@ -1,2 +1,2 @@
-./img2sam_wfc3uv_379.xgf
+./img2sam_wfc3uv_379.xOg
 cp -p outputq.fits outputq_F606W.fits

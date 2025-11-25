@@ -1,22 +1,21 @@
 # Fortran compiler
 F77 = gfortran-mp-14
-
 # Flags
 OPT = -g
 
 # All .F sources
 SRCS = $(wildcard *.F)
 
-# Convert program.F → program.xgf
-EXECUTABLES = $(SRCS:.F=.xgf)
+# Convert program.F → program.xOg)
+EXECUTABLES = $(SRCS:.F=.xOg)
 
 # Default: build all executables
 all: $(EXECUTABLES)
 
-# Rule: program.F → program.xgf
-%.xgf: %.F
+# Rule: program.F → program.xOg
+%.xOg: %.F
 	$(F77) $(OPT) $< -o $@
 
 # Clean everything
 clean:
-	rm -f *.xgf
+	rm -f *.xOg

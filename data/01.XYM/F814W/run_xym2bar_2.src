@@ -1,4 +1,4 @@
 cp -p IN.xym2bar.2 IN.xym2bar
-./xym2bar.xgf 8
+./xym2bar.xOg 8
 cp -p MATCHUP.XYMEEE MATCHUP.XYM.02
 cp -p MATCHUP.XYMEEE MATCHUP.F814W.XYM.02

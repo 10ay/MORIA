@@ -26,7 +26,7 @@ fcode_dir = '/Users/tmbhadra/Documents/Work/NASA/moira'
 
 def copy_files(source, destination, extensions=[".fits"]):
     """
-    Copy files from one folder to another.
+    Copy files from one folder to another with the same extension.
     """
     if not os.path.exists(source):
         raise FileNotFoundError()
@@ -36,12 +36,30 @@ def copy_files(source, destination, extensions=[".fits"]):
         if os.path.isfile(path) and (any(f.endswith(e) for e in extensions)):
             shutil.copy2(source / f, os.path.join(destination, f))
 
-def data_prep_early(source, destination):
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xgf"])
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=[".xgf"])
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "01.XYM" / "F814W", extensions=[".xgf"])
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "01.XYM" / "F606W", extensions=[".xgf"])
+def copy_entire_files(source, destination, filename):
+    """
+    Copy entire files from one folder to another. 
+    """
+    if not os.path.exists(source):
+        raise FileNotFoundError()
 
+    path = os.path.join(source, filename)
+    if os.path.isfile(path):
+        shutil.copy2(source / filename, os.path.join(destination, filename))
+
+def data_prep_early(source, destination):
+    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xOg"])
+    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=[".xOg"])
+    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "01.XYM" / "F814W", extensions=[".xOg"])
+    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "01.XYM" / "F606W", extensions=[".xOg"])
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "03.LOC_TRANS" / "F814W", filename = "xym2mat.xOg")
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "03.LOC_TRANS" / "F814W", filename = "img2extract_wfc3uv_psflist.xOg")
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "03.LOC_TRANS" / "F606W", filename = "xym2mat.xOg")
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "03.LOC_TRANS" / "F606W", filename = "img2extract_wfc3uv_psflist.xOg")
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F814W", filename = "uvp2psf_simst.xOg")
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F606W", filename = "uvp2psf_simstV.xOg")
+
+    
 
 def run_xgf_conversion(directory, script='run_convert_C1K1C.src'):
     """
@@ -120,6 +138,7 @@ def data_prep(directory):
         base_dir_one = base_dir / '01.XYM'/ f
         files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])
         files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.fits')])
+
 
         
         output_file_dir = base_dir / '01.XYM' / f
@@ -556,6 +575,24 @@ def extract_psf_1(directory):
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W")
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W")
+    f814_images   = int(input("Enter the number of images for the F814W filter: "))
+    f606_images   = int(input("Enter the number of images for the F606W filter: "))
+    
+    def prepare_data(f814_images, directory, f= 'F814W'):
+        base_dir = Path(directory).resolve()
+        subdir = base_dir / f
+        in_good_psf_list = 'IN.good_psf_list.1'
+        
+        output_file_dir = base_dir / '04.EXTRACT_PSF' / f
+        output_file_img = os.path.join(output_file_dir, in_good_psf_list)
+
+
+        with open(output_file_img, "w") as f:
+            for i in range(1, f814_images + 1):
+                value = 0 if i == 1 else 1
+                f.write(f"{i:2d}   {value}\n")
+                
+    prepare_data(f814_images, directory)
     run_uvp2psf_simst(directory)
         
 def extract_psf_2(directory):
