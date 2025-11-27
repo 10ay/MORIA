@@ -59,8 +59,21 @@ def data_prep_early(source, destination):
     copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F814W", filename = "uvp2psf_simst.xOg")
     copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F606W", filename = "uvp2psf_simstV.xOg")
 
-    
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F814W" / "1star-fit", filename = "mcmc_expand_average.xOg")
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F814W" / "2star-fit", filename = "mcmc_expand_average.xOg")
 
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F606W" / "1star-fit", filename = "mcmc_expand_average.xOg")
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F606W" / "2star-fit", filename = "mcmc_expand_average.xOg")
+
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F814W" / "1star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F814W" / "2star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
+    print(True)
+
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F606W" / "1star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F606W" / "2star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
+
+
+    
 def run_xgf_conversion(directory, script='run_convert_C1K1C.src'):
     """
     Run the conversion script on _flc files in F814W and F606W subdirectories.
@@ -578,7 +591,7 @@ def extract_psf_1(directory):
     f814_images   = int(input("Enter the number of images for the F814W filter: "))
     f606_images   = int(input("Enter the number of images for the F606W filter: "))
     
-    def prepare_data(f814_images, directory, f= 'F814W'):
+    def prepare_data(images, directory, f= 'F814W'):
         base_dir = Path(directory).resolve()
         subdir = base_dir / f
         in_good_psf_list = 'IN.good_psf_list.1'
@@ -588,14 +601,15 @@ def extract_psf_1(directory):
 
 
         with open(output_file_img, "w") as f:
-            for i in range(1, f814_images + 1):
+            for i in range(1, images + 1):
                 value = 0 if i == 1 else 1
                 f.write(f"{i:2d}   {value}\n")
                 
     prepare_data(f814_images, directory)
+    prepare_data(f606_images, directory, f = 'F606W')
     run_uvp2psf_simst(directory)
         
-def extract_psf_2(directory):
+def extract_psf_2(good_psf, directory):
     """
     Generate a local PSF for each filter, using the stars that are similar in magnitude and color to the target star. The magnitude similarity is thought to be important because the CTE losses are expected to make PSF shapes magnitude dependent. 
 
@@ -609,6 +623,19 @@ def extract_psf_2(directory):
     Local PSF for each filter
     """
 
+    def prepare_data(good_psf, directory, f= 'F814W'):
+        base_dir = Path(directory).resolve()
+        subdir = base_dir / f
+        in_good_psf_list = 'IN.good_psf_list.2'
+        output_file_dir = base_dir / '04.EXTRACT_PSF' / f
+        output_file_img = os.path.join(output_file_dir, in_good_psf_list)
+
+
+        with open(output_file_img, "w") as f:
+            for i in range(1, len(good_psf) + 1):
+                value = good_psf[i-1]
+                f.write(f"{i:2d}   {value}\n")
+                
     def run_uvp2psf_simst(directory, script='run_uvp2psf_simst_1.src'):
         """Finds a sky value for each star in each exposure using the pixels between 8.5 and 13.5 pixels of the center."""
         log_file = Path(directory).resolve() / f"run_uvp2psf_simst_1.log"
@@ -635,7 +662,294 @@ def extract_psf_2(directory):
                 sys.stderr = sys.__stderr__
         print(f"Finished run_uvp2psf_simst_2")
         
+    prepare_data(good_psf, directory)
+    prepare_data(good_psf, directory, f='F606W')
     run_uvp2psf_simst(directory)
+
+
+def tri_fit_dataprep_twostar(directory, f = 'F814W'):
+
+    x1 = float(input("Initial x position for object 1"))
+    y1 = float(input("Initial y position for object 1"))
+
+    x2 = float(input("Initial x position for object 2"))
+    y2 = float(input("Initial y position for object 2"))
+ 
+    x3 = float(input("Initial x position for object 3"))
+    y3 = float(input("Initial y position for object 3"))
+
+    f1 = float(input("Initial flux for object 1"))
+    f2 = float(input("Initial flux for object 2"))
+
+    mcmc_dr1 = float(input("Maximum MCMC jump size for object 1"))
+    mcmc_dr2 = float(input("Maximum MCMC jump size for object 2"))
+    mcmc_dr3 = float(input("Maximum MCMC jump size for object 3"))
+    mcmc_df1 = float(input("Maximum MCMC jump size for flux of object 1"))
+    mcmc_df2 = float(input("Maximum MCMC jump size for flux of object 2"))
+
+    nmcmc = int(input("MCMC step sizes"))
+
+    fudge = float(input("Input fudge factor. Input 1.0 if you don't know what this is"))
+
+    dufitmn = float(input("Minimum du cut"))
+    dufitmx = float(input("Maximum du cut"))
+    dvfitmn =float(input("Minimum dv cut"))
+    dvfitmx = float(input("Maximum dv cut"))
+    chi2cut = float(input("Chi-squared cut"))
+
+    
+    if f == 'F814W':
+        content = [
+            "psfout_simst.fits",
+            "simst",
+            "I_KeckNOcon",
+            "0.0  99999.  0.0  99999.",
+            f"{x1} {y1} {x2} {y2} {x3} {y3} {f1} {f2}",
+            f"{mcmc_dr1} {mcmc_dr2} {mcmc_dr3} {mcmc_df1} {mcmc_df2}",
+            "1.0",
+            f"{nmcmc}",
+            f"{dufitmn} {dufitmx} {dvfitmn} {dvfitmx} {chi2cut}"
+        ]
+    else:
+        content = [
+            "psfout_simstV.fits",
+            "simstV",
+            "V_KeckNOcon",
+            "0.0  99999.  0.0  99999.",
+            f"{x1} {y1} {x2} {y2} {x3} {y3} {f1} {f2}",
+            f"{mcmc_dr1} {mcmc_dr2} {mcmc_dr3} {mcmc_df1} {mcmc_df2}",
+            "1.0",
+            f"{nmcmc}",
+            f"{dufitmn} {dufitmx} {dvfitmn} {dvfitmx} {chi2cut}"
+        ]
+
+    filename = 'IN.uvp2tri_NOscon_fs_asym_mcmc'
+    base_dir = Path(directory).resolve()
+    output_file_dir = base_dir / '06.FIT' / f / '2star-fit'
+    output_file = os.path.join(output_file_dir, filename)
+    
+    with open(output_file, "w") as f:
+        for line in content:
+            f.write(line.rstrip() + "\n")
+
+    print(f"File '{filename}' successfully created.")
+
+
+
+def tri_fit_dataprep_threestar(directory, f = 'F814W'):
+
+    x1 = float(input("Initial x position for object 1"))
+    y1 = float(input("Initial y position for object 1"))
+
+    x2 = float(input("Initial x position for object 2"))
+    y2 = float(input("Initial y position for object 2"))
+ 
+    x3 = float(input("Initial x position for object 3"))
+    y3 = float(input("Initial y position for object 3"))
+
+    f1 = float(input("Initial flux for object 1"))
+    f2 = float(input("Initial flux for object 2"))
+
+    mcmc_dr1 = float(input("Maximum MCMC jump size for object 1"))
+    mcmc_dr2 = float(input("Maximum MCMC jump size for object 2"))
+    mcmc_dr3 = float(input("Maximum MCMC jump size for object 3"))
+    mcmc_df1 = float(input("Maximum MCMC jump size for flux of object 1"))
+    mcmc_df2 = float(input("Maximum MCMC jump size for flux of object 2"))
+
+    nmcmc = int(input("MCMC step sizes"))
+
+    fudge = float(input("Input fudge factor. Input 1.0 if you don't know what this is"))
+
+    dufitmn = float(input("Minimum du cut"))
+    dufitmx = float(input("Maximum du cut"))
+    dvfitmn =float(input("Minimum dv cut"))
+    dvfitmx = float(input("Maximum dv cut"))
+    chi2cut = float(input("Chi-squared cut"))
+
+    
+    if f == 'F814W':
+        content = [
+            "psfout_simst.fits",
+            "simst",
+            "I_KeckNOcon",
+            "0.0  99999.  0.0  99999.",
+            f"{x1} {y1} {x2} {y2} {x3} {y3} {f1} {f2}",
+            f"{mcmc_dr1} {mcmc_dr2} {mcmc_dr3} {mcmc_df1} {mcmc_df2}",
+            "1.0",
+            f"{nmcmc}",
+            f"{dufitmn} {dufitmx} {dvfitmn} {dvfitmx} {chi2cut}"
+        ]
+    else:
+        content = [
+            "psfout_simstV.fits",
+            "simstV",
+            "V_KeckNOcon",
+            "0.0  99999.  0.0  99999.",
+            f"{x1} {y1} {x2} {y2} {x3} {y3} {f1} {f2}",
+            f"{mcmc_dr1} {mcmc_dr2} {mcmc_dr3} {mcmc_df1} {mcmc_df2}",
+            "1.0",
+            f"{nmcmc}",
+            f"{dufitmn} {dufitmx} {dvfitmn} {dvfitmx} {chi2cut}"
+        ]
+
+    filename = 'IN.uvp2tri_NOscon_fs_asym_mcmc'
+    base_dir = Path(directory).resolve()
+    output_file_dir = base_dir / '06.FIT' / f / '3star-fit'
+    output_file = os.path.join(output_file_dir, filename)
+    
+    with open(output_file, "w") as f:
+        for line in content:
+            f.write(line.rstrip() + "\n")
+
+    print(f"File '{filename}' successfully created.")
+
+
+def tri_fit_dataprep_onestar(directory, f = 'F814W'):
+
+    x1 = float(input("Initial x position for object 1"))
+    y1 = float(input("Initial y position for object 1"))
+
+    x2 = float(0)
+    y2 = float(0)
+ 
+    x3 = float(0)
+    y3 = float(0)
+
+    f1 = float(1)
+    f2 = float(0)
+
+    mcmc_dr1 = float(input("Maximum MCMC jump size for object 1"))
+    mcmc_dr2 = float(0)
+    mcmc_dr3 = float(0)
+    mcmc_df1 = float(input("Maximum MCMC jump size for flux of object 1"))
+    mcmc_df2 = float(0)
+
+    nmcmc = int(input("MCMC step sizes"))
+
+    fudge = float(input("Input fudge factor. Input 1.0 if you don't know what this is"))
+
+    dufitmn = float(input("Minimum du cut"))
+    dufitmx = float(input("Maximum du cut"))
+    dvfitmn =float(input("Minimum dv cut"))
+    dvfitmx = float(input("Maximum dv cut"))
+    chi2cut = float(input("Chi-squared cut"))
+
+    if f == 'F814W':
+        content = [
+            "psfout_simst.fits",
+            "simst",
+            "I_KeckNOcon",
+            "0.0  99999.  0.0  99999.",
+            f"{x1} {y1} {x2} {y2} {x3} {y3} {f1} {f2}",
+            f"{mcmc_dr1} {mcmc_dr2} {mcmc_dr3} {mcmc_df1} {mcmc_df2}",
+            "1.0",
+            f"{nmcmc}",
+            f"{dufitmn} {dufitmx} {dvfitmn} {dvfitmx} {chi2cut}"
+        ]
+    else:
+        content = [
+            "psfout_simstV.fits",
+            "simstV",
+            "V_KeckNOcon",
+            "0.0  99999.  0.0  99999.",
+            f"{x1} {y1} {x2} {y2} {x3} {y3} {f1} {f2}",
+            f"{mcmc_dr1} {mcmc_dr2} {mcmc_dr3} {mcmc_df1} {mcmc_df2}",
+            "1.0",
+            f"{nmcmc}",
+            f"{dufitmn} {dufitmx} {dvfitmn} {dvfitmx} {chi2cut}"
+        ]
+
+    filename = 'IN.uvp2tri_NOscon_fs_asym_mcmc'
+    base_dir = Path(directory).resolve()
+    output_file_dir = base_dir / '06.FIT' / f / '1star-fit'
+    output_file = os.path.join(output_file_dir, filename)
+    
+    with open(output_file, "w") as f:
+        for line in content:
+            f.write(line.rstrip() + "\n")
+
+    print(f"File '{filename}' successfully created.")
+
+
+def tri_fit_final_F814W_opt(source, directory):
+    """
+    Fit the pixels of the target star with the PSF to determine the best-fit 2 or 3-star model in the F814W filter. 
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory containing 00.DATA/ and 01.XYM/ folders.
+
+    Returns
+    -------
+    Local PSF for each filter
+    """
+
+    def run_uvp2psf_simst_1(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
+        log_file = Path(directory).resolve() / f"uvp2tri_scon_fs_asym_mcmc.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
+                folders = ['3star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script = script
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_uvp2psf_simst_1")
+
+        
+    def run_mcmc_expand_average_814W(directory, script='run_mcmc_expand_average.src'):
+        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
+                folders = ['3star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_mcmc_expand_average")
+        
+
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename = "mcmc_expand_average.xOg")
+
+    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit",  extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit")
+    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit")
+    copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", extensions=[".fits"])
+    copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit", extensions=[".fits"])
+
+    
+    run_uvp2psf_simst_1(directory)
+    #run_uvp2psf_simst_2(directory)
+    run_mcmc_expand_average_814W(directory)
+    #run_mcmc_expand_average_606W(directory)
 
 
 
@@ -677,59 +991,12 @@ def tri_fit_final_F814W(directory):
                 sys.stderr = sys.__stderr__
         print(f"Finished run_uvp2psf_simst_1")
 
-    def run_uvp2psf_simst_2(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
-        log_file = Path(directory).resolve() / f"uvp2tri_scon_fs_asym_mcmc.log"
-        with open(log_file, "w") as logf:
-            try:
-                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
-                folders = ['1star-fit', '2star-fit']
-                for f in folders:
-                    subdir = base_dir / f
-                    script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-        print(f"Finished run_uvp2psf_simst_1")
         
     def run_mcmc_expand_average_814W(directory, script='run_mcmc_expand_average.src'):
         log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
-                folders = ['1star-fit', '2star-fit']
-                for f in folders:
-                    subdir = base_dir / f
-                    script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-        print(f"Finished run_mcmc_expand_average")
-        
-    def run_mcmc_expand_average_606W(directory, script='run_mcmc_expand_average.src'):
-        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
-        with open(log_file, "w") as logf:
-            try:
-                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
                 folders = ['1star-fit', '2star-fit']
                 for f in folders:
                     subdir = base_dir / f
@@ -844,5 +1111,74 @@ def tri_fit_final_F606W(directory):
     #run_mcmc_expand_average_606W(directory)
 
 
+def tri_fit_final_F606W_opt(directory):
+    """
+    Fit the pixels of the target star with the PSF to determine the best-fit 2 or 3-star model in the 606W filter. 
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory containing 00.DATA/ and 01.XYM/ folders.
+
+    Returns
+    -------
+    Local PSF for each filter
+    """
+
+    def run_uvp2psf_simst_2(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
+        log_file = Path(directory).resolve() / f"uvp2tri_scon_fs_asym_mcmc.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
+                folders = ['1star-fit', '2star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_uvp2psf_simst_1")
+        
+    def run_mcmc_expand_average_606W(directory, script='run_mcmc_expand_average.src'):
+        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
+                folders = ['3star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script_path = base_dir / f / script
+                    print(base_dir)
+                    print(script_path)
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_mcmc_expand_average")
+        
+    run_uvp2psf_simst_2(directory)
+    #run_uvp2psf_simst_2(directory)
+    run_mcmc_expand_average_606W(directory)
+    #run_mcmc_expand_average_606W(directory)
+
+
+    
+    
     
     

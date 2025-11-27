@@ -1,0 +1,20 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     convert_C1K1C.xOg
+relocations:
+  - { offset: 0x1A, size: 0x8, addend: 0x0, symName: _writfits_i2_32k_, symObjAddr: 0x0, symBinAddr: 0x1000006C0, symSize: 0x15EC }
+  - { offset: 0x3A, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x3F28, symBinAddr: 0x1000045E8, symSize: 0x3C }
+  - { offset: 0x8E, size: 0x8, addend: 0x0, symName: _MAIN__, symObjAddr: 0x3BF4, symBinAddr: 0x1000042B4, symSize: 0x334 }
+  - { offset: 0xEC, size: 0x8, addend: 0x0, symName: _pixi.2, symObjAddr: 0x6430, symBinAddr: 0x10000C004, symSize: 0x0 }
+  - { offset: 0x102, size: 0x8, addend: 0x0, symName: _pixr.1, symObjAddr: 0x2006430, symBinAddr: 0x10200C004, symSize: 0x0 }
+  - { offset: 0x1AA, size: 0x8, addend: 0x0, symName: _buff2pix_r4_edge_, symObjAddr: 0x39A0, symBinAddr: 0x100004060, symSize: 0x254 }
+  - { offset: 0x266, size: 0x8, addend: 0x0, symName: _sneaky_, symBinAddr: 0x10240C9C0, symSize: 0x0 }
+  - { offset: 0x342, size: 0x8, addend: 0x0, symName: _readfits_r4e_, symObjAddr: 0x16E4, symBinAddr: 0x100001DA4, symSize: 0x22BC }
+  - { offset: 0x3D0, size: 0x8, addend: 0x0, symName: _fitsinfo_, symBinAddr: 0x10240C010, symSize: 0x0 }
+  - { offset: 0x3F4, size: 0x8, addend: 0x0, symName: _hdr_, symBinAddr: 0x10240C2D0, symSize: 0x0 }
+  - { offset: 0x417, size: 0x8, addend: 0x0, symName: _laxis3__, symBinAddr: 0x10240C9B0, symSize: 0x0 }
+  - { offset: 0x47E, size: 0x8, addend: 0x0, symName: _diag.3, symObjAddr: 0x642C, symBinAddr: 0x10000C000, symSize: 0x0 }
+  - { offset: 0x666, size: 0x8, addend: 0x0, symName: _pix2buff_i2_32k_, symObjAddr: 0x15EC, symBinAddr: 0x100001CAC, symSize: 0xF8 }
+  - { offset: 0x731, size: 0x8, addend: 0x0, symName: _writfits_i2_32k_, symObjAddr: 0x0, symBinAddr: 0x1000006C0, symSize: 0x15EC }
+  - { offset: 0x7B4, size: 0x8, addend: 0x0, symName: _hdr_, symBinAddr: 0x10240C2D0, symSize: 0x0 }
+...
