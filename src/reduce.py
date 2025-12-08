@@ -67,7 +67,6 @@ def data_prep_early(source, destination):
 
     copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F814W" / "1star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
     copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F814W" / "2star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
-    print(True)
 
     copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F606W" / "1star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
     copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F606W" / "2star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
