@@ -1177,7 +1177,272 @@ def tri_fit_final_F606W_opt(directory):
     #run_mcmc_expand_average_606W(directory)
 
 
+def calibration_input_file_one(directory):
+    
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "psfout_simst.fits")
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "psfout_simstV.fits")
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "img2extract_wfc3uv_psflist_Cal.uvp.gz")
+
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "img2extract_wfc3uv_psflist_simst.uvp.gz")
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "img2extract_wfc3uv_psflist_CalV.uvp.gz")
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "img2extract_wfc3uv_psflist_simstV.uvp.gz")
+
+
+    base_dir = Path(directory).resolve() 
+    subdir = base_dir / "07.CALIBRATION"
+    in_psf_star_mags_mcmc_I = 'IN.psf_star_mags_mcmc_I'
+    output_file_psf_star_mags_mcmc_I = os.path.join(subdir, in_psf_star_mags_mcmc_I)
+    markov_chain_steps = int(input("Enter the number of Markov chain steps"))
+    maximum_size_mcmc = float(input("Enter the maximum size of MCMC coordinate steps in pixels"))
+    fudge = float(input("Enter the error bar fudge factor. Let fuge be 1 by default"))
+    maximum_distance_x = float(input("Enter maximum distance in x from the star center for pixels to be included in the fit"))
+    maximum_distance_y = float(input("Enter maximum distance in y from the star center for pixels to be included in the fit"))
+    chi2cut = float(input("Enter the χ2 threshold to define an outlier pixel."))
+    sky_model = int(input("The sky model to use"))
+    star_numbers = int(input("A list of star numbers to produce PIX_SHOW files for"))
+    content = [
+            "psfout_simst.fits",
+            "Cal",
+            "Cal_I",
+            f"{markov_chain_steps}",
+            f"{maximum_size_mcmc} {fudge}",
+            f"{maximum_distance_x} {maximum_distance_y} {chi2cut}",
+            f"{sky_model}",
+            f"{star_numbers}",
+            "0"
+        ]
+
+    with open(output_file_psf_star_mags_mcmc_I, "w") as f:
+        for line in content:
+            f.write(line.rstrip() + "\n")
+
+    print(f"File '{in_psf_star_mags_mcmc_I}' successfully created.")
+
+
+    
+    return
+
+
+
+    
+def calibration_input_file_two(directory):
+    
+    base_dir = Path(directory).resolve() 
+    subdir = base_dir / "07.CALIBRATION"
+    in_psf_star_mags_mcmc_V = 'IN.psf_star_mags_mcmc_V'
+    output_file_psf_star_mags_mcmc_V = os.path.join(subdir, in_psf_star_mags_mcmc_V)
+    markov_chain_steps = int(input("Enter the number of Markov chain steps"))
+    maximum_size_mcmc = float(input("Enter the maximum size of MCMC coordinate steps in pixels"))
+    fudge = float(input("Enter the error bar fudge factor. Let fuge be 1 by default"))
+    maximum_distance_x = float(input("Enter maximum distance in x from the star center for pixels to be included in the fit"))
+    maximum_distance_y = float(input("Enter maximum distance in y from the star center for pixels to be included in the fit"))
+    chi2cut = float(input("Enter the χ2 threshold to define an outlier pixel."))
+    sky_model = int(input("The sky model to use"))
+    star_numbers = int(input("A list of star numbers to produce PIX_SHOW files for"))
+    content = [
+            "psfout_simstV.fits",
+            "CalV",
+            "Cal_V",
+            f"{markov_chain_steps}",
+            f"{maximum_size_mcmc} {fudge}",
+            f"{maximum_distance_x} {maximum_distance_y} {chi2cut}",
+            f"{sky_model}",
+            f"{star_numbers}",
+            "0"
+        ]
+
+    with open(output_file_psf_star_mags_mcmc_V, "w") as f:
+        for line in content:
+            f.write(line.rstrip() + "\n")
+
+    print(f"File '{in_psf_star_mags_mcmc_V}' successfully created.")
+
+
+    
+    return
+
+    
+def calibration_new_matchup(directory):
+    """
+    The goal here is to calibrate the HST photometry to the OGLE-III database.
+    """
+
+    #def prepare_data(good_psf, directory, f= 'F814W'):
+    #    base_dir = Path(directory).resolve()
+     #   subdir = base_dir / f
+      #  in_good_psf_list = 'IN.good_psf_list.2'
+      #  output_file_dir = base_dir / '04.EXTRACT_PSF' / f
+       # output_file_img = os.path.join(output_file_dir, in_good_psf_list)
+
+
+#        with open(output_file_img, "w") as f:
+ #           for i in range(1, len(good_psf) + 1):
+  #              value = good_psf[i-1]
+   #             f.write(f"{i:2d}   {value}\n")
+
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "NOTFAR_CAL_STARS.XYIVB_targ")
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "NEARBY_SIM_STARS.XYIVB_targ")
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "NEARBY_REF_STARS.XYIVB_targ")
+
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "MATCHUP.F606W.XYM")
+    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "MATCHUP.F814W.XYM.02")
+
+    def psf_star_mags_mcmc(directory, script='run_psf_star_Imags_mcmc.src'):
+        
+        log_file = Path(directory).resolve() / f"run_psf_star_Imags_mcmc.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "07.CALIBRATION"
+                subdir = base_dir 
+                script = 'run_psf_star_Imags_mcmc.src'
+                script_path = base_dir / script
+                print(base_dir)
+                print(script_path)
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_psf_star_Imags_mcmc")
+
+        log_file = Path(directory).resolve() / f"run_psf_star_Vmags_mcmc.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "07.CALIBRATION"
+                subdir = base_dir 
+                script = 'run_psf_star_Vmags_mcmc.src'
+                script_path = base_dir / script
+                print(base_dir)
+                print(script_path)
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_psf_star_Vmags_mcmc")
+        return 
+    
+
+    def cal_star_num(directory, script='run_cal_star_num_2_MATCHUP.src'):
+        
+        log_file = Path(directory).resolve() / f"run_cal_star_num_2_MATCHUP.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "07.CALIBRATION"
+                subdir = base_dir 
+                script = 'run_cal_star_num_2_MATCHUP.src'
+                script_path = base_dir / script
+                print(base_dir)
+                print(script_path)
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished cal_star_num_2_MATCHUP")
+        return
+
+    #psf_star_mags_mcmc(directory)
+    cal_star_num(directory)
+    #VI_HST_ogle_man_match4(directory)
+    #fit_HST_IV_ogle_col_1(directory)
     
     
+
+def calibration_hst_ogle_match(directory):
+    """
+    The goal here is to calibrate the HST photometry to the OGLE-III database.
+    """
+
+    def VI_HST_ogle_man_match4(directory, script='run_VI_HST_ogle_man_match4.src'):
+        
+        log_file = Path(directory).resolve() / f"run_VI_HST_ogle_man_match4.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "07.CALIBRATION"
+                subdir = base_dir 
+                script = 'run_VI_HST_ogle_man_match4.src'
+                script_path = base_dir / script
+                print(base_dir)
+                print(script_path)
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished run_VI_HST_ogle_man_match4")
+        return
+
+    VI_HST_ogle_man_match4(directory)
     
+
+def fit_calibration(directory):
+    """
+    The goal here is to calibrate the HST photometry to the OGLE-III database.
+    """
+
+    def fit_HST_IV_ogle_col_1(directory, script='run_fit_HST_IV_ogle_col_1.src'):
+        
+        log_file = Path(directory).resolve() / f"run_fit_VI_HST_ogle_man_match4.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "07.CALIBRATION"
+                subdir = base_dir 
+                script = 'run_fit_HST_IV_ogle_col_1.src'
+                script_path = base_dir / script
+                print(base_dir)
+                print(script_path)
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
+                script = 'run_fit_HST_IV_ogle_col_2.src'
+                script_path = base_dir / script
+                print(base_dir)
+                print(script_path)
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
+                
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+        print(f"Finished fitting calibration")
+        return
+
+    fit_HST_IV_ogle_col_1(directory)
+     
     
