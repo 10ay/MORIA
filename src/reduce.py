@@ -12,6 +12,10 @@ from datetime import datetime as dt
 import pandas as pd
 import shutil
 import sys
+import matplotlib.pyplot as plt
+import argparse
+parser = argparse.ArgumentParser()
+
 
 
 """
@@ -88,32 +92,24 @@ def run_xgf_conversion(directory, script='run_convert_C1K1C.src'):
     Convert from _flc files to _WJ2 files
     """
     base_dir = Path(directory).resolve() / '00.DATA'
-
-    # Make sure script exists
-    script_path = base_dir / script
-
-    if not script_path.exists():
-        raise FileNotFoundError(f'Conversion script not found: {script_path}')
-
-    # Subdirectories to process
     filters = ['F814W', 'F606W']
-
+    
     for f in filters:
         subdir = base_dir / f
+        script_path = subdir / script
+        
         if not subdir.exists():
             print(f'Missing subdirectory.')
             continue
 
-        # Get list of _flc files
         flc_files = list(subdir.glob('*_flc.fits'))
 
         if not flc_files:
             print(f'Missing flc files')
             continue
 
-        # Run the script inside the subdir
         subprocess.run(
-            ['csh', str(script_path)],  # assumes csh script
+            ['csh', str(script_path)],  
             cwd=subdir,
             check=False
         )
@@ -240,7 +236,7 @@ def matchup_files(directory):
         Run img2xym_wfc3uv on exposures in the F814W subdirectory.
         Produces .XYM files for each exposure using the PSFEFF_WFC3UV_F814W_C0.fits library PSF.
         """
-        log_file = Path(directory).resolve() /'"run_img2xym_wfc3uv.log'
+        log_file = Path(directory).resolve() / "01.XYM" / "log_files" / "run_img2xym_wfc3uv.log"
         with open(log_file, "w") as logf:
             sys.stdout = sys.stderr = logf
             try:
@@ -258,19 +254,15 @@ def matchup_files(directory):
                         text=True,
                         check=False
                     )
-                    print("Done", f)
             finally:
                 sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-
-        print(f"Finished run_img2xym_wfc3uv")
-        
+                sys.stderr = sys.__stderr__        
 
     def run_xym2mat(directory, filters = ['F814W'], script='run_xym2mat_1.src'):
         """
         Produces TRANS.xym2mat, as well as 16 MAT.0 files.
         """
-        log_file = Path(directory).resolve() / f'run_xym2mat_{script.replace('.src','')}.log'
+        log_file = Path(directory).resolve() / "01.XYM" / "log_files" / f"{script.replace('.src','')}.log"
 
         with open(log_file, "w") as logf:
             sys.stdout = sys.stderr = logf
@@ -293,22 +285,18 @@ def matchup_files(directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-
-        print(f"Finished run_xym2mat")
         
 
     def run_xym2bar(directory, filters = ['F814W'], script='run_xym2bar_1.src'):
         """
         Get a final list of photometry that allowed small zeropoint shifts for each exposure
         """
-        log_file = Path(directory).resolve() / f'run_xym2bar_{script.replace('.src','')}.log'
+        log_file = Path(directory).resolve() / "01.XYM" / "log_files" / f"{script.replace('.src','')}.log"
 
         with open(log_file, "w") as logf:
             sys.stdout = sys.stderr = logf
             try:
                 base_dir = Path(directory).resolve() / "01.XYM"
-                
-
                 for f in filters:
                     subdir = base_dir / f
                     script_to_use = script if f == 'F814W' else 'run_xym2bar.src'
@@ -324,7 +312,6 @@ def matchup_files(directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        print(f"Finished run_xym2bar")
 
     copy_files(source=Path(directory).resolve() / "00.DATA" / "F814W", destination=Path(directory).resolve() / "01.XYM" / "F814W", extensions=[".fits"])
     copy_files(source=Path(directory).resolve() / "00.DATA" / "F606W", destination=Path(directory).resolve() / "01.XYM" / "F606W", extensions=[".fits"])
@@ -339,39 +326,30 @@ def matchup_files(directory):
     run_xym2bar(directory, filters = ['F606W'])
 
 
-    #copy files
-    #Repeat for F606W
-
-
 def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
     """
     Create a stack of the scene in the reference frame.
     """
-
-    log_file = Path(directory).resolve() / f'output_stack.log'
-
+    log_file = Path(directory).resolve() /  "01.XYM" / "log_files" / f"run_img2sam_wfc3uv_379.log"
     with open(log_file, "w") as logf:
         sys.stdout = sys.stderr = logf
         try:
-                
             base_dir = Path(directory).resolve() / "01.XYM"
             filters = ['F814W', 'F606W']
-            
-        
             for f in filters:
                 subdir = base_dir / f
                 script_path = subdir / script if f == "F814W" else subdir / script
-                
                 subprocess.run(
                     ["csh", str(script_path)],  # assumes csh script
-                    cwd=subdir,
+                    cwd=subdir,                        
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
                     text=True,
                     check=False
                 )
         finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__        
-    print(f"Created output stacks")
 
 def data_prep_loc_trans(directory, filters = 'F814W'):
     """
@@ -531,17 +509,238 @@ def loc_trans(directory):
 
 
 def cmd_diagram(directory):
+
     copy_files(source=Path(directory).resolve() / "01.XYM" / "F814W", destination=Path(directory).resolve() / "02.CMD", extensions=[".02"])
     copy_files(source=Path(directory).resolve() / "01.XYM" / "F606W", destination=Path(directory).resolve() / "02.CMD", extensions=[".XYM"])
     subdir = Path(directory).resolve() / "02.CMD"
-    script_path = Path(directory).resolve() / "02.CMD" / "cmd_plot.py"
-    subprocess.run(
-                    ["python", str(script_path)],
-                    cwd=subdir,
-                )
-
-
+    #script_path = Path(directory).resolve() / "02.CMD" / "cmd_plot.py"
+    #import numpy as np
+    #import matplotlib.pyplot as plt
     
+    #Load the MATCHUP files
+    
+    
+    #xv, yv, mv are the x, y and magnitudes for the V band. Same logic for the I band
+    
+    xv, yv, mv = np.loadtxt(Path(directory).resolve() / "02.CMD" / "MATCHUP.F606W.XYM", unpack=True, usecols=(0,1,2))
+    xi, yi, mi = np.loadtxt(Path(directory).resolve() / "02.CMD" / "MATCHUP.F814W.XYM.02", unpack=True, usecols=(0,1,2))
+    
+    #Establish target parameters
+    
+    response = str(input("Do you have a target? Enter 'Yes' if you do."))
+    if response == 'yes' or response == 'Yes':
+        xtarg = float(input("Enter x-coord of your target"))
+        ytarg = float(input("Enter y-coord of your target"))
+        Vtarg = float(input("Enter V magnitude of your target"))
+        Itarg = float(input("Enter I magnitude of your target"))
+    else:
+#        pdb.set_trace()
+        xtarg, ytarg = xi[0], yi[0]
+        Vtarg, Itarg = mv[0], mi[0]
+#        xtarg, ytarg = 535.2320, 623.8950
+#        Vtarg, Itarg = -10.2651, -10.3052
+    VmItarg = Vtarg - Itarg
+    
+    #Function to find the CMD of the target and get our list of Sim+Ref stars.
+
+    def show_cmd_targ(directory, response, xi, yi, xv, yv, mi, mv):
+    
+        #Plotting parameters 
+        if response == 'yes' or response == 'Yes':
+    
+            rad_max = float(input("Enter maximum plotting radius"))
+            box_max = float(input("Enter maximum box radius"))
+            mag_range = float(input("Enter magnitude range for plotting"))
+            col_range = float(input("Enter color range for plotting"))
+            ref_st_Imx = float(input("Enter reference star input I max"))
+            ref_st_Imn = float(input("Enter reference star input I min"))
+            ref_st_Vmx = float(input("Enter reference star input V max"))
+            ref_st_Vmn = float(input("Enter reference star input V min"))
+        else:
+            rad_max, box_max = 300, 300
+            mag_range, col_range = 0.50, 0.30
+            ref_st_Imx, ref_st_Imn = mi + 4, mi -4 
+            ref_st_Vmx, ref_st_Vmn = mv + 4. , mv-4
+        
+       # rad_max, box_max = 300, 300
+        #mag_range, col_range = 0.50, 0.30
+        #ref_st_Imx, ref_st_Imn = -8.8, -12.75
+        #ref_st_Vmx, ref_st_Vmn = -8.7, -12.75
+    
+        d = np.sqrt((xi-xtarg)**2 + (yi-ytarg)**2)
+        n = np.arange(1, len(mi)+1)
+    
+        #Plotting parameter tlo decide how many stars around the target should be selected 
+    
+        vprox = np.abs(mi - Itarg) < mag_range
+        cprox = np.abs(mv - mi - VmItarg) < col_range
+    
+        #vprox and cprox are boolean arrays. Stars close to our target within a given window 
+    
+        u = vprox & cprox #These are the stars close to the target in both magnitude and color space.
+    
+    
+        uref = (d < rad_max) & cprox & (mv < ref_st_Vmx) & (mv > ref_st_Vmn) & (mi < ref_st_Imx) & (mi > ref_st_Imn) & (n > 1) #More selective than u
+    
+        fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+        ax_cmd = ax[0,0]
+        ax_xy_I = ax[1,1]
+        ax_xy_zoom = ax[1,0]
+        ax_xy_V = ax[0, 1]
+    
+        # CMD 
+        ax_cmd.scatter(mv-mi, mi, s=5, c='k', label='All Stars')
+        ax_cmd.scatter((mv-mi)[u], mi[u], s=15, c='purple', label='Selected Stars')
+        ax_cmd.scatter([VmItarg], [Itarg], marker='x', lw = 5, s=100, c='grey', label='Target')
+        ax_cmd.set_xlim(-0.75, 1.75)
+        ax_cmd.set_ylim(-15, -7)   
+        ax_cmd.set_xlabel('F606W - F814W')
+        ax_cmd.set_ylabel('F814W')
+        ax_cmd.legend(loc = 'lower right')
+        ax_cmd.set_title('CMD')
+    
+        # XY for I filter
+        ax_xy_I.scatter(xi, yi, s=5, c='k', label = 'All Stars') # All stars
+        #ax_xy_I.scatter(xi[u], yi[u], s=15, c='r') # I avoid this from SM and prefer uref instead
+        ax_xy_I.scatter(xi[uref], yi[uref], s=30, c='purple', label = 'Actual selected stars')
+        ax_xy_I.scatter([xtarg], [ytarg], marker='x', lw = 5, s=100, c='grey', label = 'Target') #Target
+        circle = plt.Circle((xtarg, ytarg), rad_max, color='hotpink', fill=False, lw=2) 
+        ax_xy_I.add_patch(circle)
+        ax_xy_I.set_xlim(xtarg-box_max, xtarg+box_max)
+        ax_xy_I.set_ylim(ytarg-box_max, ytarg+box_max)
+        ax_xy_I.set_xlabel('x coord')
+        ax_xy_I.set_ylabel('y coord')
+        ax_xy_I.legend(loc = 'lower right')
+        ax_xy_I.set_title('XY Coord I-Filter')
+    
+        # XY for V filter
+        ax_xy_V.scatter(xv, yv, s=5, c='k', label = 'All Stars') # All stars
+        ax_xy_V.scatter(xv[uref], yv[uref], s=30, c='purple', label = 'Actual selected stars')
+        ax_xy_V.scatter([xtarg], [ytarg], marker='x',lw = 5, s=100, c='grey', label = 'Target') #Target
+        circle = plt.Circle((xtarg, ytarg), rad_max, color='hotpink', fill=False, lw=2) 
+        ax_xy_V.add_patch(circle)
+        ax_xy_V.set_xlim(xtarg-box_max, xtarg+box_max)
+        ax_xy_V.set_ylim(ytarg-box_max, ytarg+box_max)
+        ax_xy_V.set_xlabel('x coord')
+        ax_xy_V.set_ylabel('y coord')
+        ax_xy_V.legend(loc = 'lower right')
+        ax_xy_V.set_title('XY Coord V-Filter')
+    
+    
+        # XY zoom for I-filter
+        mask_zoom = u & (d < rad_max)
+        ax_xy_zoom.scatter(xi, yi, s=5, c='k', label = 'All Stars')
+        #ax_xy_zoom.scatter(xi[mask_zoom], yi[mask_zoom], s=15, c='r')
+        ax_xy_zoom.scatter(xi[uref], yi[uref], s=30, c='purple', label = 'Actual selected stars')
+        ax_xy_zoom.scatter([xtarg], [ytarg], marker='x', lw = 5, s=100, c='grey', label = 'Target')
+        circle2 = plt.Circle((xtarg, ytarg), rad_max, color='hotpink', fill=False, lw=2)
+        ax_xy_zoom.add_patch(circle2)
+        ax_xy_zoom.set_xlim(xtarg-box_max, xtarg+box_max)
+        ax_xy_zoom.set_ylim(ytarg-box_max, ytarg+box_max)
+        ax_xy_zoom.set_xlabel('x coord')
+        ax_xy_zoom.set_ylabel('y coord')
+        ax_xy_zoom.legend(loc='lower right')
+        ax_xy_zoom.set_title('XY Coord I-Filter Zoom')
+    
+        plt.tight_layout()
+        plt.savefig(Path(directory).resolve() / "02.CMD" / "show_cmd_targ.pdf")
+        plt.close(fig)
+    
+        xu = xi[u & (d < rad_max)]
+        yu =  yi[u & (d < rad_max)]
+        miu = mi[u & (d < rad_max)]
+        mvu = mv[u & (d < rad_max)]
+    
+        upsf = np.ones_like(xu, dtype=int)
+    
+        assert len(upsf) > 0
+    #    if len(upsf) > 0 could be another condition
+    
+        upsf[0] = 0  # first star (the target) can't be used for PSF 
+     
+    
+        np.savetxt(Path(directory).resolve() / "02.CMD" / 'NEARBY_SIM_STARS.XYIVB_targ', np.column_stack([xu, yu, miu, mvu, upsf]), fmt='%10.3f %10.3f %8.4f %8.4f %1d', header="xu         yu      miu      mvu   upsf \n")
+    
+        np.savetxt(Path(directory).resolve() / "02.CMD" / 'NEARBY_REF_STARS.XYIVB_targ', np.column_stack([xi[uref], yi[uref], mi[uref], mv[uref]]), fmt='%10.3f %10.3f %8.4f %8.4f', header = "xuref      yuref   miuref      mvuref \n")
+    
+    #Function to give calibration stars
+    def show_cmd_Cal(directory, response, xi, yi, xv, yv, mi, mv):
+        #Plotting parameters 
+        if response == 'yes' or response == 'Yes':
+
+            rad_max = float(input("Enter maximum plotting radius"))
+            box_max = float(input("Enter maximum box radius"))
+            Vcalc = float(input("Enter V magnitude for calibration"))
+            Icalc = float(input("Enter I magnitude for calibration"))
+            mag_range = float(input("Enter magnitude range for plotting"))
+            col_range = float(input("Enter color range for plotting"))
+        else:
+            rad_max, box_max = 300, 300
+            mag_range, col_range = 0.50, 0.30
+            Vcalc, Icalc = -10, -10
+        ref_st_Imx, ref_st_Imn = Icalc + mag_range, Icalc - mag_range
+        ref_st_Vmx, ref_st_Vmn = Vcalc + mag_range, Vcalc - mag_range
+
+        d = np.sqrt((xi-xtarg)**2 + (yi-ytarg)**2)
+        vprox = np.abs(mi - Icalc) < mag_range
+        cprox = np.abs(mv - mi - VmItarg) < col_range
+    
+        u = vprox & cprox
+    
+        uref = (d < rad_max) & cprox & (mv < ref_st_Vmx) & (mv > ref_st_Vmn) & (mi < ref_st_Imx) & (mi > ref_st_Imn)
+    
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    
+        # CMD
+        ax_cmd = ax[0]
+        ax_cmd.scatter(mv-mi, mi, s=5, c='k', label='All Stars')
+    #    ax_cmd.scatter((mv-mi)[u], mi[u], s=15, c='r', label='Selected Stars')
+        ax_cmd.scatter((mv-mi)[u], mi[u], s=15, c='purple', label='Selected Stars')
+        ax_cmd.scatter([VmItarg], [Itarg], marker='x', lw =5, s=100, c='grey', label='Target')
+        ax_cmd.set_xlim(-0.75, 1.25)
+        ax_cmd.set_ylim(-15, -7)
+        ax_cmd.set_xlabel('F606W - F814W')
+        ax_cmd.set_ylabel('F814W')
+        ax_cmd.set_title('CMD')
+        ax_cmd.legend(loc = 'lower right')
+    
+        # XY
+        ax_xy = ax[1]
+        ax_xy.scatter(xi, yi, s=5, c='k', label = 'All Stars')
+        #ax_xy.scatter(xi[u], yi[u], s=15, c='purple')
+        ax_xy.scatter(xi[uref], yi[uref], s=30, c='purple', label = 'Actual Selected Stars')
+        ax_xy.scatter([xtarg], [ytarg], marker='x', lw = 5, s=100, c='grey', label = 'Target')
+        circle = plt.Circle((xtarg, ytarg), rad_max, color='hotpink', fill=False, lw=2)
+        ax_xy.add_patch(circle)
+        ax_xy.set_xlim(xtarg-box_max, xtarg+box_max)
+        ax_xy.set_ylim(ytarg-box_max, ytarg+box_max)
+        ax_xy.set_xlabel('x coord')
+        ax_xy.set_ylabel('y coord')
+        ax_xy.set_title('Calibration Stars')
+        ax_xy.legend(loc = 'lower right')
+        plt.tight_layout()
+        plt.savefig(Path(directory).resolve() / "02.CMD" / 'show_cmd_Cal.pdf')
+        plt.close(fig)
+    
+        xuref = xi[uref]
+        yuref =  yi[uref]
+        miuref = mi[uref]
+        mvuref = mv[uref]
+    
+        iMuref = np.arange(1, len(xi) + 1)[uref]
+        upsf = np.ones_like(xuref, dtype=int)
+    
+        np.savetxt(Path(directory).resolve() / "02.CMD" / 'NOTFAR_CAL_STARS.XYIVB_targ',  np.column_stack([xuref, yuref, miuref, mvuref, upsf, iMuref]), fmt='%10.3f %10.3f %8.4f %8.4f %1d %6d', header=" #  xuref      yuref    miuref   mvuref  upsf iMuref  \n")
+
+    show_cmd_targ(directory, response, xi, yi, xv, yv, mi, mv)
+
+    show_cmd_Cal(directory, response, xi, yi, xv, yv, mi, mv)
+    
+    
+        
+    
+
+
 
 def extract_psf_1(directory):
     """
