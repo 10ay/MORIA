@@ -423,7 +423,7 @@ def loc_trans(directory):
 
     def run_xym2mat(directory, script='run_xym2mat.src'):
         """Produces TRANS.xym2mat, as well as 16 MAT.0 files."""
-        log_file = Path(directory).resolve() / f"loc_trans_run_xym2mat_{script.replace('.src','')}.log"
+        log_file = Path(directory).resolve() / "03.LOC_TRANS" / "log_files" / f"loc_trans_{script.replace('.src','')}.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "03.LOC_TRANS"
@@ -431,8 +431,6 @@ def loc_trans(directory):
                 for f in filters:
                     subdir = base_dir / f
                     script_path = subdir / script if f == "F814W" else base_dir / "F606W" / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -444,11 +442,10 @@ def loc_trans(directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        print(f"Finished run_xym2mat.src")
 
     def run_img2extract_wfc3uv_psflist(directory):
         """Run extraction for PSF list generation (simulation)."""
-        log_file = Path(directory).resolve() / f"loc_trans_run_img2extract_wfc3uv_psflist.log"
+        log_file = Path(directory).resolve() /  "03.LOC_TRANS" / "log_files" / f"loc_trans_run_img2extract_wfc3uv_psflist.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "03.LOC_TRANS"
@@ -457,8 +454,6 @@ def loc_trans(directory):
                     subdir = base_dir / f
                     script = 'run_img2extract_wfc3uv_psflist_simst.src' if f == "F814W" else 'run_img2extract_wfc3uv_psflist_simstV.src'
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -470,12 +465,11 @@ def loc_trans(directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        print(f"Finished run_img2extract_wfc3uv_psflist")
 
     def run_img2extract_wfc3uv_psflist_Cal(directory):
         """Run extraction for PSF list generation (calibration)."""
 
-        log_file = Path(directory).resolve() / f"loc_trans_run_img2extract_wfc3uv_psflist_Cal.log"
+        log_file = Path(directory).resolve() /   "03.LOC_TRANS" / "log_files" / f"loc_trans_run_img2extract_wfc3uv_psflist_Cal.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "03.LOC_TRANS"
@@ -484,8 +478,6 @@ def loc_trans(directory):
                     subdir = base_dir / f
                     script = 'run_img2extract_wfc3uv_psflist_Cal.src' if f == "F814W" else 'run_img2extract_wfc3uv_psflist_CalV.src'
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -497,10 +489,7 @@ def loc_trans(directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        print(f"Finished run_img2extract_wfc3uv_psflist_Cal")
-
-
-    print(directory)
+                
     data_prep_loc_trans(directory)
     data_prep_loc_trans(directory, filters = 'F606W')
     run_xym2mat(directory)
@@ -759,7 +748,7 @@ def extract_psf_1(directory):
 
     def run_uvp2psf_simst(directory, iteration = 1, script='run_uvp2psf_simst_1.src'):
         """Finds a sky value for each star in each exposure using the pixels between 8.5 and 13.5 pixels of the center."""
-        log_file = Path(directory).resolve() / f"run_uvp2psf_simst_1.log"
+        log_file = Path(directory).resolve() / "04.EXTRACT_PSF" / "log_files" / f"run_uvp2psf_simst_1.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "04.EXTRACT_PSF"
@@ -768,8 +757,6 @@ def extract_psf_1(directory):
                     subdir = base_dir / f
                     script = 'run_uvp2psf_simst_1.src' if f == "F814W" else 'run_uvp2psf_simstV_1.src'
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -781,7 +768,6 @@ def extract_psf_1(directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        print(f"Finished run_uvp2psf_simst_1")
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W")
@@ -793,11 +779,8 @@ def extract_psf_1(directory):
         base_dir = Path(directory).resolve()
         subdir = base_dir / f
         in_good_psf_list = 'IN.good_psf_list.1'
-        
         output_file_dir = base_dir / '04.EXTRACT_PSF' / f
         output_file_img = os.path.join(output_file_dir, in_good_psf_list)
-
-
         with open(output_file_img, "w") as f:
             for i in range(1, images + 1):
                 value = 0 if i == 1 else 1
@@ -834,9 +817,9 @@ def extract_psf_2(good_psf, directory):
                 value = good_psf[i-1]
                 f.write(f"{i:2d}   {value}\n")
                 
-    def run_uvp2psf_simst(directory, script='run_uvp2psf_simst_1.src'):
+    def run_uvp2psf_simst(directory, script='run_uvp2psf_simst_2.src'):
         """Finds a sky value for each star in each exposure using the pixels between 8.5 and 13.5 pixels of the center."""
-        log_file = Path(directory).resolve() / f"run_uvp2psf_simst_1.log"
+        log_file = Path(directory).resolve() / "04.EXTRACT_PSF" / "log_files" / f"run_uvp2psf_simst_2.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "04.EXTRACT_PSF"
@@ -845,8 +828,6 @@ def extract_psf_2(good_psf, directory):
                     subdir = base_dir / f
                     script = 'run_uvp2psf_simst_2.src' if f == "F814W" else 'run_uvp2psf_simstV_2.src'
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -858,7 +839,6 @@ def extract_psf_2(good_psf, directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        print(f"Finished run_uvp2psf_simst_2")
         
     prepare_data(good_psf, directory)
     prepare_data(good_psf, directory, f='F606W')
@@ -1083,17 +1063,15 @@ def tri_fit_final_F814W_opt(source, directory):
     """
 
     def run_uvp2psf_simst_1(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
-        log_file = Path(directory).resolve() / f"uvp2tri_scon_fs_asym_mcmc.log"
+        log_file = Path(directory).resolve() / "06.FIT" /  "F814W" / "3star-fit" / "log_files" / f"uvp2tri_scon_fs_asym_mcmc.log"
         with open(log_file, "w") as logf:
             try:
-                base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
+                base_dir = Path(directory).resolve() / "06.FIT" /  "F814W"
                 folders = ['3star-fit']
                 for f in folders:
                     subdir = base_dir / f
                     script = script
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -1105,11 +1083,10 @@ def tri_fit_final_F814W_opt(source, directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        print(f"Finished run_uvp2psf_simst_1")
 
         
     def run_mcmc_expand_average_814W(directory, script='run_mcmc_expand_average.src'):
-        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
+        log_file = Path(directory).resolve() / "06.FIT" /  "F814W" / "3star-fit" / "log_files" /  f"run_mcmc_expand_average.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
@@ -1117,8 +1094,6 @@ def tri_fit_final_F814W_opt(source, directory):
                 for f in folders:
                     subdir = base_dir / f
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -1130,7 +1105,6 @@ def tri_fit_final_F814W_opt(source, directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        print(f"Finished run_mcmc_expand_average")
         
 
     copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename = "mcmc_expand_average.xOg")
@@ -1165,17 +1139,15 @@ def tri_fit_final_F814W(directory):
     """
 
     def run_uvp2psf_simst_1(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
-        log_file = Path(directory).resolve() / f"uvp2tri_scon_fs_asym_mcmc.log"
-        with open(log_file, "w") as logf:
-            try:
-                base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
-                folders = ['1star-fit', '2star-fit']
-                for f in folders:
+        folders = ['1star-fit', '2star-fit']
+        for f in folders:
+            log_file = Path(directory).resolve() / "06.FIT" / "F814W" / f /"log_files" / f"uvp2tri_scon_fs_asym_mcmc.log"
+            with open(log_file, "w") as logf:
+                try:
+                    base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
                     subdir = base_dir / f
                     script = script
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -1184,23 +1156,20 @@ def tri_fit_final_F814W(directory):
                         text=True,
                         check=False
                     )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-        print(f"Finished run_uvp2psf_simst_1")
+                finally:
+                    sys.stdout = sys.__stdout__
+                    sys.stderr = sys.__stderr__
 
         
     def run_mcmc_expand_average_814W(directory, script='run_mcmc_expand_average.src'):
-        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
-        with open(log_file, "w") as logf:
-            try:
-                base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
-                folders = ['1star-fit', '2star-fit']
-                for f in folders:
+        folders = ['1star-fit', '2star-fit']
+        for f in folders:
+            log_file = Path(directory).resolve() / "06.FIT" / "F814W" / f / "log_files" / f"run_mcmc_expand_average.log"
+            with open(log_file, "w") as logf:
+                try:
+                    base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
                     subdir = base_dir / f
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -1209,10 +1178,9 @@ def tri_fit_final_F814W(directory):
                         text=True,
                         check=False
                     )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-        print(f"Finished run_mcmc_expand_average")
+                finally:
+                    sys.stdout = sys.__stdout__
+                    sys.stderr = sys.__stderr__
         
     
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "1star-fit", extensions=[".gz"])
@@ -1235,9 +1203,7 @@ def tri_fit_final_F814W(directory):
 
     
     run_uvp2psf_simst_1(directory)
-    #run_uvp2psf_simst_2(directory)
     run_mcmc_expand_average_814W(directory)
-    #run_mcmc_expand_average_606W(directory)
 
 
 
@@ -1256,16 +1222,14 @@ def tri_fit_final_F606W(directory):
     """
 
     def run_uvp2psf_simst_2(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
-        log_file = Path(directory).resolve() / f"uvp2tri_scon_fs_asym_mcmc.log"
-        with open(log_file, "w") as logf:
-            try:
-                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
-                folders = ['1star-fit', '2star-fit']
-                for f in folders:
+        folders = ['1star-fit', '2star-fit']
+        for f in folders:
+            log_file = Path(directory).resolve() / "06.FIT" / "F606W" / f / "log_files" /f"uvp2tri_scon_fs_asym_mcmc.log"
+            with open(log_file, "w") as logf:
+                try:
+                    base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
                     subdir = base_dir / f
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -1274,22 +1238,19 @@ def tri_fit_final_F606W(directory):
                         text=True,
                         check=False
                     )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-        print(f"Finished run_uvp2psf_simst_1")
+                finally:
+                    sys.stdout = sys.__stdout__
+                    sys.stderr = sys.__stderr__
         
     def run_mcmc_expand_average_606W(directory, script='run_mcmc_expand_average.src'):
-        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
-        with open(log_file, "w") as logf:
-            try:
-                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
-                folders = ['1star-fit', '2star-fit']
-                for f in folders:
+        folders = ['1star-fit', '2star-fit']
+        for f in folders:
+            log_file = Path(directory).resolve() / "06.FIT" / "F606W" / f / "log_files" / f"run_mcmc_expand_average.log"
+            with open(log_file, "w") as logf:
+                try:
+                    base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
                     subdir = base_dir / f
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -1298,15 +1259,12 @@ def tri_fit_final_F606W(directory):
                         text=True,
                         check=False
                     )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-        print(f"Finished run_mcmc_expand_average")
+                finally:
+                    sys.stdout = sys.__stdout__
+                    sys.stderr = sys.__stderr__
         
     run_uvp2psf_simst_2(directory)
-    #run_uvp2psf_simst_2(directory)
     run_mcmc_expand_average_606W(directory)
-    #run_mcmc_expand_average_606W(directory)
 
 
 def tri_fit_final_F606W_opt(directory):
@@ -1323,31 +1281,7 @@ def tri_fit_final_F606W_opt(directory):
     """
 
     def run_uvp2psf_simst_2(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
-        log_file = Path(directory).resolve() / f"uvp2tri_scon_fs_asym_mcmc.log"
-        with open(log_file, "w") as logf:
-            try:
-                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
-                folders = ['1star-fit', '2star-fit']
-                for f in folders:
-                    subdir = base_dir / f
-                    script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-        print(f"Finished run_uvp2psf_simst_1")
-        
-    def run_mcmc_expand_average_606W(directory, script='run_mcmc_expand_average.src'):
-        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log"
+        log_file = Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit" / "log_files" / f"uvp2tri_scon_fs_asym_mcmc.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
@@ -1355,8 +1289,6 @@ def tri_fit_final_F606W_opt(directory):
                 for f in folders:
                     subdir = base_dir / f
                     script_path = base_dir / f / script
-                    print(base_dir)
-                    print(script_path)
                     subprocess.run(
                         ["csh", str(script_path)],
                         cwd=subdir,
@@ -1368,12 +1300,30 @@ def tri_fit_final_F606W_opt(directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        print(f"Finished run_mcmc_expand_average")
+        
+    def run_mcmc_expand_average_606W(directory, script='run_mcmc_expand_average.src'):
+        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log" / "06.FIT" / "F606W" / "3star-fit" / "log_files" 
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
+                folders = ['3star-fit']
+                for f in folders:
+                    subdir = base_dir / f
+                    script_path = base_dir / f / script
+                    subprocess.run(
+                        ["csh", str(script_path)],
+                        cwd=subdir,
+                        stdout=logf,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        check=False
+                    )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
         
     run_uvp2psf_simst_2(directory)
-    #run_uvp2psf_simst_2(directory)
     run_mcmc_expand_average_606W(directory)
-    #run_mcmc_expand_average_606W(directory)
 
 
 def calibration_input_file_one(directory):
