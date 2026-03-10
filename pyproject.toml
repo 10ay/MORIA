@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moria"
+version = "0.1.0"
+description = "MORIA: HST fly star reduction pipeline"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Your Name", email = "you@example.com" }
+]
+
+dependencies = [
+  "numpy",
+  "astropy",
+  "pandas",
+  "matplotlib",
+]
+
+[project.urls]
+Homepage = "https://example.com/moria"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"moria" = ["fortran_compile/*"]
+
+[project.scripts]
+moria = "moria.cli:main"
+

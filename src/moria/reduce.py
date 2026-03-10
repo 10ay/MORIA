@@ -14,8 +14,9 @@ import shutil
 import sys
 import matplotlib.pyplot as plt
 import argparse
-parser = argparse.ArgumentParser()
+from importlib import resources
 
+parser = argparse.ArgumentParser()
 
 
 """
@@ -26,7 +27,12 @@ The HST fly star reduction pipeline depends on a certain directory structure.
     01.XYM/
 """
 
-fcode_dir = '/Users/tmbhadra/Documents/Work/NASA/moira'
+
+def get_fortran_dir():
+    """
+    Return the path to the compiled Fortran executables bundled with MORIA.
+    """
+    return resources.files("moria") / "fortran_compile"
 
 def copy_files(source, destination, extensions=[".fits"]):
     """
@@ -52,28 +58,29 @@ def copy_entire_files(source, destination, filename):
         shutil.copy2(source / filename, os.path.join(destination, filename))
 
 def data_prep_early(source, destination):
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xOg"])
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=[".xOg"])
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "01.XYM" / "F814W", extensions=[".xOg"])
-    copy_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "01.XYM" / "F606W", extensions=[".xOg"])
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "03.LOC_TRANS" / "F814W", filename = "xym2mat.xOg")
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "03.LOC_TRANS" / "F814W", filename = "img2extract_wfc3uv_psflist.xOg")
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "03.LOC_TRANS" / "F606W", filename = "xym2mat.xOg")
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "03.LOC_TRANS" / "F606W", filename = "img2extract_wfc3uv_psflist.xOg")
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F814W", filename = "uvp2psf_simst.xOg")
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F606W", filename = "uvp2psf_simstV.xOg")
+    fortran_src = get_fortran_dir()
+    copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xOg"])
+    copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=[".xOg"])
+    copy_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM" / "F814W", extensions=[".xOg"])
+    copy_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM" / "F606W", extensions=[".xOg"])
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F814W", filename="xym2mat.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F814W", filename="img2extract_wfc3uv_psflist.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F606W", filename="xym2mat.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F606W", filename="img2extract_wfc3uv_psflist.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F814W", filename="uvp2psf_simst.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F606W", filename="uvp2psf_simstV.xOg")
 
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F814W" / "1star-fit", filename = "mcmc_expand_average.xOg")
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F814W" / "2star-fit", filename = "mcmc_expand_average.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "06.FIT" / "F814W" / "1star-fit", filename="mcmc_expand_average.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "06.FIT" / "F814W" / "2star-fit", filename="mcmc_expand_average.xOg")
 
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F606W" / "1star-fit", filename = "mcmc_expand_average.xOg")
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F606W" / "2star-fit", filename = "mcmc_expand_average.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "06.FIT" / "F606W" / "1star-fit", filename="mcmc_expand_average.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "06.FIT" / "F606W" / "2star-fit", filename="mcmc_expand_average.xOg")
 
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F814W" / "1star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F814W" / "2star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "06.FIT" / "F814W" / "1star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "06.FIT" / "F814W" / "2star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
 
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F606W" / "1star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(destination).resolve() / "06.FIT" / "F606W" / "2star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "06.FIT" / "F606W" / "1star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "06.FIT" / "F606W" / "2star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
 
 
     
@@ -1107,9 +1114,10 @@ def tri_fit_final_F814W_opt(source, directory):
                 sys.stderr = sys.__stderr__
         
 
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename = "mcmc_expand_average.xOg")
+    fortran_src = get_fortran_dir()
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename="mcmc_expand_average.xOg")
 
-    copy_entire_files(source=Path(source).resolve() / "src" / "fortran_compile", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename = "uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit",  extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit")
