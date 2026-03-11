@@ -1,5 +1,6 @@
 README.md
 pyproject.toml
+setup.py
 src/moria/__init__.py
 src/moria/cli.py
 src/moria/reduce.py

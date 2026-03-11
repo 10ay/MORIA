@@ -57,7 +57,7 @@ def copy_entire_files(source, destination, filename):
     if os.path.isfile(path):
         shutil.copy2(source / filename, os.path.join(destination, filename))
 
-def data_prep_early(source, destination):
+def data_prep_early(destination):
     fortran_src = get_fortran_dir()
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xOg"])
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=[".xOg"])
