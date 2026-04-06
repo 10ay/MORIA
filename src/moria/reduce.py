@@ -15,6 +15,11 @@ import sys
 import matplotlib.pyplot as plt
 import argparse
 from importlib import resources
+import urllib.request
+import urllib.error
+import bz2
+import urllib.parse
+import re
 
 parser = argparse.ArgumentParser()
 
@@ -82,7 +87,11 @@ def data_prep_early(destination):
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "06.FIT" / "F606W" / "1star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "06.FIT" / "F606W" / "2star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
 
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "07.CALIBRATION", filename="VI_HST_ogle_man_match4.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "07.CALIBRATION", filename="fit_HST_IV_ogle_col.xOg")
 
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "07.CALIBRATION", filename="psf_star_mags_mcmc.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "07.CALIBRATION", filename="cal_star_num_2_MATCHUP.xOg")
     
 def run_xgf_conversion(directory, script='run_convert_C1K1C.src'):
     """
@@ -852,7 +861,7 @@ def extract_psf_2(good_psf, directory):
     run_uvp2psf_simst(directory)
 
 
-def tri_fit_dataprep_twostar(directory, f = 'F814W'):
+def hst_fit_dataprep_twostar(directory, f = 'F814W'):
 
     x1 = float(input("Initial x position for object 1"))
     y1 = float(input("Initial y position for object 1"))
@@ -872,7 +881,7 @@ def tri_fit_dataprep_twostar(directory, f = 'F814W'):
     mcmc_df1 = float(input("Maximum MCMC jump size for flux of object 1"))
     mcmc_df2 = float(input("Maximum MCMC jump size for flux of object 2"))
 
-    nmcmc = int(input("MCMC step sizes"))
+    nmcmc = int(input("MCMC step sizes (Recommended: >50000)"))
 
     fudge = float(input("Input fudge factor. Input 1.0 if you don't know what this is"))
 
@@ -921,7 +930,7 @@ def tri_fit_dataprep_twostar(directory, f = 'F814W'):
 
 
 
-def tri_fit_dataprep_threestar(directory, f = 'F814W'):
+def hst_fit_dataprep_threestar(directory, f = 'F814W'):
 
     x1 = float(input("Initial x position for object 1"))
     y1 = float(input("Initial y position for object 1"))
@@ -989,7 +998,7 @@ def tri_fit_dataprep_threestar(directory, f = 'F814W'):
     print(f"File '{filename}' successfully created.")
 
 
-def tri_fit_dataprep_onestar(directory, f = 'F814W'):
+def hst_fit_dataprep_onestar(directory, f = 'F814W'):
 
     x1 = float(input("Initial x position for object 1"))
     y1 = float(input("Initial y position for object 1"))
@@ -1056,7 +1065,7 @@ def tri_fit_dataprep_onestar(directory, f = 'F814W'):
     print(f"File '{filename}' successfully created.")
 
 
-def tri_fit_final_F814W_opt(source, directory):
+def tri_fit_F814W_opt(directory):
     """
     Fit the pixels of the target star with the PSF to determine the best-fit 2 or 3-star model in the F814W filter. 
     Parameters
@@ -1091,7 +1100,15 @@ def tri_fit_final_F814W_opt(source, directory):
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
 
-        
+    def strip_star_lines_from_uvp2tri_mcmc_814W(directory):
+        mcmc_path = (
+            Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit" / "uvp2tri_scon_fsky_I_KeckNOcon.07.mcmc")
+        if not mcmc_path.is_file():
+            raise FileNotFoundError(f"Expected MCMC file not found: {mcmc_path}")
+        lines = mcmc_path.read_text().splitlines(keepends=True)
+        kept = [ln for ln in lines if not ln.lstrip().startswith("***")]
+        mcmc_path.write_text("".join(kept))
+
     def run_mcmc_expand_average_814W(directory, script='run_mcmc_expand_average.src'):
         log_file = Path(directory).resolve() / "06.FIT" /  "F814W" / "3star-fit" / "log_files" /  f"run_mcmc_expand_average.log"
         with open(log_file, "w") as logf:
@@ -1112,7 +1129,19 @@ def tri_fit_final_F814W_opt(source, directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        
+
+    _fit_3star = Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit"
+    _uvp2tri_fsky_outputs = (
+        "uvp2tri_scon_fsky_I_KeckNOcon.01.pix_all",
+        "uvp2tri_scon_fsky_I_KeckNOcon.03.pix_use",
+        "uvp2tri_scon_fsky_I_KeckNOcon.04.probe_fit",
+        "uvp2tri_scon_fsky_I_KeckNOcon.05.final_fit",
+        "uvp2tri_scon_fsky_I_KeckNOcon.06.pix_show.fits",
+        "uvp2tri_scon_fsky_I_KeckNOcon.07.mcmc",
+        "uvp2tri_scon_fsky_I_KeckNOcon.08.rm_pix",
+    )
+    for name in _uvp2tri_fsky_outputs:
+        (_fit_3star / name).unlink(missing_ok=True)
 
     fortran_src = get_fortran_dir()
     copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename="mcmc_expand_average.xOg")
@@ -1128,12 +1157,13 @@ def tri_fit_final_F814W_opt(source, directory):
     
     run_uvp2psf_simst_1(directory)
     #run_uvp2psf_simst_2(directory)
+    strip_star_lines_from_uvp2tri_mcmc_814W(directory)
     run_mcmc_expand_average_814W(directory)
     #run_mcmc_expand_average_606W(directory)
 
 
 
-def tri_fit_final_F814W(directory):
+def hst_fit_final_F814W(directory):
     """
     Fit the pixels of the target star with the PSF to determine the best-fit 2 or 3-star model in the F814W filter. 
     Parameters
@@ -1169,6 +1199,16 @@ def tri_fit_final_F814W(directory):
                     sys.stderr = sys.__stderr__
 
         
+    def strip_star_lines_from_uvp2tri_mcmc_814W(directory):
+        folders = ['1star-fit', '2star-fit']
+        for f in folders:
+            mcmc_path = (Path(directory).resolve() / "06.FIT" / "F814W" / f / "uvp2tri_scon_fsky_I_KeckNOcon.07.mcmc")
+            if not mcmc_path.is_file():
+                raise FileNotFoundError(f"Expected MCMC file not found: {mcmc_path}")
+            lines = mcmc_path.read_text().splitlines(keepends=True)
+            kept = [ln for ln in lines if not ln.lstrip().startswith("***")]
+            mcmc_path.write_text("".join(kept))
+
     def run_mcmc_expand_average_814W(directory, script='run_mcmc_expand_average.src'):
         folders = ['1star-fit', '2star-fit']
         for f in folders:
@@ -1189,8 +1229,22 @@ def tri_fit_final_F814W(directory):
                 finally:
                     sys.stdout = sys.__stdout__
                     sys.stderr = sys.__stderr__
-        
-    
+
+    folders = ['1star-fit', '2star-fit']
+    for f in folders:
+        _fit_2star = Path(directory).resolve() / "06.FIT" / "F814W" / f
+        _uvp2tri_fsky_outputs = (
+            "uvp2tri_scon_fsky_I_KeckNOcon.01.pix_all",
+            "uvp2tri_scon_fsky_I_KeckNOcon.03.pix_use",
+            "uvp2tri_scon_fsky_I_KeckNOcon.04.probe_fit",
+            "uvp2tri_scon_fsky_I_KeckNOcon.05.final_fit",
+            "uvp2tri_scon_fsky_I_KeckNOcon.06.pix_show.fits",
+            "uvp2tri_scon_fsky_I_KeckNOcon.07.mcmc",
+            "uvp2tri_scon_fsky_I_KeckNOcon.08.rm_pix",
+        )
+        for name in _uvp2tri_fsky_outputs:
+            (_fit_2star / name).unlink(missing_ok=True)
+
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "1star-fit", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "2star-fit", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "1star-fit",  extensions=[".gz"])
@@ -1203,20 +1257,20 @@ def tri_fit_final_F814W(directory):
 
     copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "1star-fit", extensions=[".fits"])
     copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "2star-fit", extensions=[".fits"])
-
-    
+  
 
     copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "1star-fit", extensions=[".fits"])
     copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "2star-fit", extensions=[".fits"])
 
     
     run_uvp2psf_simst_1(directory)
+    strip_star_lines_from_uvp2tri_mcmc_814W(directory)
     run_mcmc_expand_average_814W(directory)
 
 
 
 
-def tri_fit_final_F606W(directory):
+def hst_fit_final_F606W(directory):
     """
     Fit the pixels of the target star with the PSF to determine the best-fit 2 or 3-star model in the 606W filter. 
     Parameters
@@ -1249,6 +1303,17 @@ def tri_fit_final_F606W(directory):
                 finally:
                     sys.stdout = sys.__stdout__
                     sys.stderr = sys.__stderr__
+
+    def strip_star_lines_from_uvp2tri_mcmc_606W(directory):
+        folders = ['1star-fit', '2star-fit']
+        for f in folders:
+            mcmc_path = (Path(directory).resolve() / "06.FIT" / "F606W" / f / "uvp2tri_scon_fsky_V_KeckNOcon.07.mcmc")
+            if not mcmc_path.is_file():
+                raise FileNotFoundError(f"Expected MCMC file not found: {mcmc_path}")
+            lines = mcmc_path.read_text().splitlines(keepends=True)
+            kept = [ln for ln in lines if not ln.lstrip().startswith("***")]
+            mcmc_path.write_text("".join(kept))
+
         
     def run_mcmc_expand_average_606W(directory, script='run_mcmc_expand_average.src'):
         folders = ['1star-fit', '2star-fit']
@@ -1270,12 +1335,28 @@ def tri_fit_final_F606W(directory):
                 finally:
                     sys.stdout = sys.__stdout__
                     sys.stderr = sys.__stderr__
+
+    folders = ['1star-fit', '2star-fit']
+    for f in folders:
+        _fit_2star = Path(directory).resolve() / "06.FIT" / "F606W" / f
+        _uvp2tri_fsky_outputs = (
+            "uvp2tri_scon_fsky_V_KeckNOcon.01.pix_all",
+            "uvp2tri_scon_fsky_V_KeckNOcon.03.pix_use",
+            "uvp2tri_scon_fsky_V_KeckNOcon.04.probe_fit",
+            "uvp2tri_scon_fsky_V_KeckNOcon.05.final_fit",
+            "uvp2tri_scon_fsky_V_KeckNOcon.06.pix_show.fits",
+            "uvp2tri_scon_fsky_V_KeckNOcon.07.mcmc",
+            "uvp2tri_scon_fsky_V_KeckNOcon.08.rm_pix",
+        )
+        for name in _uvp2tri_fsky_outputs:
+            (_fit_2star / name).unlink(missing_ok=True)
         
     run_uvp2psf_simst_2(directory)
+    strip_star_lines_from_uvp2tri_mcmc_606W(directory)
     run_mcmc_expand_average_606W(directory)
 
 
-def tri_fit_final_F606W_opt(directory):
+def tri_fit_F606W_opt(directory):
     """
     Fit the pixels of the target star with the PSF to determine the best-fit 2 or 3-star model in the 606W filter. 
     Parameters
@@ -1308,9 +1389,17 @@ def tri_fit_final_F606W_opt(directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
+
+    def strip_star_lines_from_uvp2tri_mcmc_606W(directory):
+        mcmc_path = (Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit" / "uvp2tri_scon_fsky_V_KeckNOcon.07.mcmc")
+        if not mcmc_path.is_file():
+            raise FileNotFoundError(f"Expected MCMC file not found: {mcmc_path}")
+        lines = mcmc_path.read_text().splitlines(keepends=True)
+        kept = [ln for ln in lines if not ln.lstrip().startswith("***")]
+        mcmc_path.write_text("".join(kept))
         
     def run_mcmc_expand_average_606W(directory, script='run_mcmc_expand_average.src'):
-        log_file = Path(directory).resolve() / f"run_mcmc_expand_average.log" / "06.FIT" / "F606W" / "3star-fit" / "log_files" 
+        log_file = Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit" / "log_files" / f"run_mcmc_expand_average.log" 
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
@@ -1329,8 +1418,25 @@ def tri_fit_final_F606W_opt(directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
+    
         
+    _fit_2star = Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit"
+    _uvp2tri_fsky_outputs = (
+        "uvp2tri_scon_fsky_V_KeckNOcon.01.pix_all",
+        "uvp2tri_scon_fsky_V_KeckNOcon.03.pix_use",
+        "uvp2tri_scon_fsky_V_KeckNOcon.04.probe_fit",
+        "uvp2tri_scon_fsky_V_KeckNOcon.05.final_fit",
+        "uvp2tri_scon_fsky_V_KeckNOcon.06.pix_show.fits",
+        "uvp2tri_scon_fsky_V_KeckNOcon.07.mcmc",
+        "uvp2tri_scon_fsky_V_KeckNOcon.08.rm_pix",
+    )
+    for name in _uvp2tri_fsky_outputs:
+        (_fit_2star / name).unlink(missing_ok=True)
+    
+    fortran_src = get_fortran_dir()
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
     run_uvp2psf_simst_2(directory)
+    strip_star_lines_from_uvp2tri_mcmc_606W(directory)
     run_mcmc_expand_average_606W(directory)
 
 
@@ -1441,12 +1547,15 @@ def calibration_new_matchup(directory):
     copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "NEARBY_SIM_STARS.XYIVB_targ")
     copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "NEARBY_REF_STARS.XYIVB_targ")
 
-    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "MATCHUP.F606W.XYM")
-    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "MATCHUP.F814W.XYM.02")
+    copy_entire_files(source=Path(directory).resolve() / "02.CMD", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "MATCHUP.F606W.XYM")
+    copy_entire_files(source=Path(directory).resolve() / "02.CMD", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "MATCHUP.F814W.XYM.02")
+
+    copy_entire_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "outputq.fits")
+
 
     def psf_star_mags_mcmc(directory, script='run_psf_star_Imags_mcmc.src'):
         
-        log_file = Path(directory).resolve() / f"run_psf_star_Imags_mcmc.log"
+        log_file = Path(directory).resolve() / "07.CALIBRATION" / "log_files" / f"run_psf_star_Imags_mcmc.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "07.CALIBRATION"
@@ -1468,7 +1577,7 @@ def calibration_new_matchup(directory):
                 sys.stderr = sys.__stderr__
         print(f"Finished run_psf_star_Imags_mcmc")
 
-        log_file = Path(directory).resolve() / f"run_psf_star_Vmags_mcmc.log"
+        log_file = Path(directory).resolve() / "07.CALIBRATION" / "log_files" / f"run_psf_star_Vmags_mcmc.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "07.CALIBRATION"
@@ -1494,7 +1603,7 @@ def calibration_new_matchup(directory):
 
     def cal_star_num(directory, script='run_cal_star_num_2_MATCHUP.src'):
         
-        log_file = Path(directory).resolve() / f"run_cal_star_num_2_MATCHUP.log"
+        log_file = Path(directory).resolve() / "07.CALIBRATION" / "log_files" / f"run_cal_star_num_2_MATCHUP.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "07.CALIBRATION"
@@ -1517,7 +1626,7 @@ def calibration_new_matchup(directory):
         print(f"Finished cal_star_num_2_MATCHUP")
         return
 
-    #psf_star_mags_mcmc(directory)
+    psf_star_mags_mcmc(directory)
     cal_star_num(directory)
     #VI_HST_ogle_man_match4(directory)
     #fit_HST_IV_ogle_col_1(directory)
@@ -1531,7 +1640,7 @@ def calibration_hst_ogle_match(directory):
 
     def VI_HST_ogle_man_match4(directory, script='run_VI_HST_ogle_man_match4.src'):
         
-        log_file = Path(directory).resolve() / f"run_VI_HST_ogle_man_match4.log"
+        log_file = Path(directory).resolve() / "07.CALIBRATION" / "log_files" / f"run_VI_HST_ogle_man_match4.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "07.CALIBRATION"
@@ -1564,7 +1673,7 @@ def fit_calibration(directory):
 
     def fit_HST_IV_ogle_col_1(directory, script='run_fit_HST_IV_ogle_col_1.src'):
         
-        log_file = Path(directory).resolve() / f"run_fit_VI_HST_ogle_man_match4.log"
+        log_file = Path(directory).resolve() / "07.CALIBRATION" / "log_files" / f"run_fit_VI_HST_ogle_man_match4.log"
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "07.CALIBRATION"
@@ -1601,5 +1710,252 @@ def fit_calibration(directory):
         return
 
     fit_HST_IV_ogle_col_1(directory)
-     
-    
+
+def get_chip_number(ogle_ra_deg, ogle_dec_deg):
+    """
+    Get the chip number from the OGLE-III field finder for you target
+    """
+    if ogle_ra_deg is not None and ogle_dec_deg is not None:
+        candidates = ogle_field_chip_candidates_from_coords(
+            ogle_ra_deg,
+            ogle_dec_deg,
+            phase=3,
+            epoch=2000.0,
+        )
+        # Most events land in a single chip; if multiple are returned, we take the first.
+        ogle_field_number = candidates[0]["field_number"]
+        ogle_chip_number = candidates[0]["chip_number"]
+        print("OGLE field candidates:", candidates)
+    else:
+        ogle_field_number = 0
+        ogle_chip_number = 0
+    return ogle_field_number, ogle_chip_number
+
+
+
+def ogle_map_and_reference_filenames(
+    ogle_field_number: int,
+    ogle_chip_number: int,
+    ogle_band: str = "I",
+    *,
+    map_prefix_case: str = "upper",
+    ref_prefix_case: str = "lower",
+):
+    """
+    Construct the OGLE-III blg filenames from a field + chip identifier.
+
+    Example (as described in `demo/in_dev.ipynb`):
+    - catalog map: blg226.7.map
+    - reference image (I band): blg226.I.7.fts
+    """
+    field = int(ogle_field_number)
+    chip = int(ogle_chip_number)
+    band = str(ogle_band).strip()
+
+    map_prefix = "BLG" if map_prefix_case.lower() == "upper" else "blg"
+    ref_prefix = "BLG" if ref_prefix_case.lower() == "upper" else "blg"
+
+    # Filenames on the remote server (lowercase `blg`).
+    map_filename_remote = f"blg{field}.{chip}.map"
+    ref_filename_remote = f"blg{field}.{band}.{chip}.fts"
+
+    # Filenames saved locally (sometimes Fortran/xgf pipelines are case-sensitive).
+    map_filename_local = f"{map_prefix}{field}.{chip}.map"
+    ref_filename_local = f"{ref_prefix}{field}.{band}.{chip}.fts"
+
+    return {
+        "map_filename_remote": map_filename_remote,
+        "ref_filename_remote": ref_filename_remote,
+        "map_filename_local": map_filename_local,
+        "ref_filename_local": ref_filename_local,
+    }
+
+
+def download_ogle_map_and_reference(
+    directory: str | Path,
+    ogle_field_number: int,
+    ogle_chip_number: int,
+    ogle_band: str = "I",
+    destination_subdir: str = "07.CALIBRATION",
+    overwrite: bool = False,
+    map_prefix_case: str = "upper",
+    ref_prefix_case: str = "lower",
+    maps_base_url: str = "http://www.astrouw.edu.pl/ogle/ogle3/maps/blg/maps/",
+    ref_images_base_url: str = "http://www.astrouw.edu.pl/ogle/ogle3/maps/blg/ref_images/",
+    timeout_s: float = 120.0,
+):
+    """
+    Download the OGLE-III photometry map and reference image needed for calibration.
+
+    The OGLE server typically hosts these as compressed files:
+    - `blg{field}.{chip}.map.bz2`  -> decompressed to `blg{field}.{chip}.map`
+    - `blg{field}.{band}.{chip}.fts.bz2` -> decompressed to `blg{field}.{band}.{chip}.fts`
+    """
+    directory = Path(directory).resolve()
+    dest_dir = directory / destination_subdir
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    fn = ogle_map_and_reference_filenames(
+        ogle_field_number=ogle_field_number,
+        ogle_chip_number=ogle_chip_number,
+        ogle_band=ogle_band,
+        map_prefix_case=map_prefix_case,
+        ref_prefix_case=ref_prefix_case,
+    )
+
+    map_path = dest_dir / fn["map_filename_local"]
+    ref_path = dest_dir / fn["ref_filename_local"]
+
+    map_candidates = [
+        maps_base_url.rstrip("/") + "/" + fn["map_filename_remote"],
+        maps_base_url.rstrip("/") + "/" + fn["map_filename_remote"] + ".bz2",
+    ]
+    ref_candidates = [
+        ref_images_base_url.rstrip("/") + "/" + fn["ref_filename_remote"],
+        ref_images_base_url.rstrip("/") + "/" + fn["ref_filename_remote"] + ".bz2",
+    ]
+
+    def download_to_path(url: str, out_path: Path):
+        with urllib.request.urlopen(url, timeout=timeout_s) as resp:
+            with open(out_path, "wb") as f:
+                shutil.copyfileobj(resp, f)
+
+    def try_download_candidates(candidates: list[str], out_path: Path) -> str:
+        if out_path.exists() and not overwrite:
+            return "already-present"
+
+        last_err = None
+        for url in candidates:
+            try:
+                if url.endswith(".bz2"):
+                    tmp_path = out_path.with_name(out_path.name + ".bz2")
+                    download_to_path(url, tmp_path)
+                    with bz2.open(tmp_path, "rb") as fin, open(out_path, "wb") as fout:
+                        shutil.copyfileobj(fin, fout)
+                    # Keep or remove the compressed copy depending on your preference;
+                    # default to cleanup so the destination stays tidy.
+                    try:
+                        tmp_path.unlink()
+                    except OSError:
+                        pass
+                    return url
+                else:
+                    download_to_path(url, out_path)
+                    return url
+            except urllib.error.HTTPError as e:
+                last_err = e
+            except Exception as e:
+                last_err = e
+
+        tried = "\n".join(f"- {c}" for c in candidates)
+        raise RuntimeError(
+            f"Failed to download OGLE files for {out_path.name}. Tried:\n{tried}\nLast error: {last_err}"
+        )
+
+    used_map_url = try_download_candidates(map_candidates, map_path)
+    used_ref_url = try_download_candidates(ref_candidates, ref_path)
+
+    return {
+        "map_url": used_map_url,
+        "ref_url": used_ref_url,
+        "map_path": str(map_path),
+        "ref_path": str(ref_path),
+    }
+
+
+def ogle_field_chip_candidates_from_coords(
+    ra_deg: float,
+    dec_deg: float,
+    phase: str | int = 3,
+    epoch: str | float = 2000.0,
+    assume_ra_is_hours_if_lt_24: bool = True,
+    base_url: str = "https://ogle.astrouw.edu.pl/cgi-ogle/uncgi.cgi/radec2field",
+    timeout_s: float = 30.0,
+) -> list[dict]:
+    """
+    Query the OGLE Field Finder to get candidate OGLE-III fields + chip numbers.
+
+    Parameters
+    ----------
+    ra_deg, dec_deg
+        Sky position in degrees 
+    phase
+        OGLE phase to query
+    epoch
+        Epoch passed through to OGLE Field Finder
+
+    Returns
+    -------
+    List of dicts like:
+      {"field_name": "BLG226.7", "field_number": 226, "chip_number": 7, "x": ..., "y": ...}
+    """
+    ra_val = float(ra_deg)
+    dec_val = float(dec_deg)
+    if assume_ra_is_hours_if_lt_24 and 0.0 <= ra_val <= 24.0:
+     #"Interpreting input RA as hours because ra_deg={ra_val} is in [0,24]. (Will send RA={ra_hours} hours to OGLE.)"
+        ra_hours = ra_val
+    else:
+        ra_hours = None
+
+    payload = {
+        "phase": str(phase),
+        # OGLE Field Finder expects RA in hours (hh.hhhh or hh:mm:ss)
+        "ra": f"{ra_hours:.6f}",
+        "dec": f"{dec_val:.6f}",
+        "epoch": f"{float(epoch):.1f}",
+    }
+
+    data = urllib.parse.urlencode(payload).encode("utf-8")
+
+    req = urllib.request.Request(base_url, data=data, method="POST")
+
+    with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        html = resp.read().decode("iso-8859-1", errors="replace")
+
+    m = re.search(r"<PRE>(.*?)</PRE>", html, flags=re.S | re.I)
+
+    if not m:
+        raise RuntimeError("Unexpected OGLE Field Finder response: missing <PRE> section.")
+
+    pre = m.group(1)
+    rows = [ln.strip() for ln in pre.splitlines() if ln.strip()]
+
+    # First row is usually: "field phase x y"
+    candidates: list[dict] = []
+    for ln in rows:
+        parts = ln.split()
+        if not parts:
+            continue
+        if parts[0].lower() == "field":
+            continue
+
+        # Expected: field phase x y
+        field_token = parts[0]
+        # field_token like "BLG126.6"
+        mf = re.match(r"([A-Za-z]+)(\d+)\.(\d+)", field_token)
+        if not mf:
+            continue
+
+        field_prefix = mf.group(1)
+        field_number = int(mf.group(2))
+        chip_number = int(mf.group(3))
+
+        x = float(parts[2]) if len(parts) > 2 else None
+        y = float(parts[3]) if len(parts) > 3 else None
+
+        candidates.append(
+            {
+                "field_name": field_token,
+                "field_prefix": field_prefix,
+                "field_number": field_number,
+                "chip_number": chip_number,
+                "x": x,
+                "y": y,
+            }
+        )
+
+    if not candidates:
+        raise ValueError(f"No OGLE field candidates found for ra_deg={ra_deg}, dec_deg={dec_deg}.")
+
+    return candidates
+

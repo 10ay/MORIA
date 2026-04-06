@@ -1,0 +1,3 @@
+gunzip img2extract_wfc3uv_psflist_Cal.uvp.gz
+./psf_star_mags_mcmc.xOg < IN.psf_star_mags_mcmc_I
+gzip img2extract_wfc3uv_psflist_Cal.uvp

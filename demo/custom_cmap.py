@@ -30,3 +30,7 @@ def ace_colors(reverse=True):
 def mpl_ace():
 
     return matplotlib.colors.LinearSegmentedColormap.from_list("", ["#000000", "#A3A3A3", "#FFFFFF", "#800080"])
+
+def mpl_nb():
+
+    return matplotlib.colors.LinearSegmentedColormap.from_list("", ["#000000", "#9C59D1", "#FFFFFF", "#FFF430"])

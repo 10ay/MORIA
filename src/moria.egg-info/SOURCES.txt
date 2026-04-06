@@ -11,11 +11,15 @@ src/moria.egg-info/entry_points.txt
 src/moria.egg-info/requires.txt
 src/moria.egg-info/top_level.txt
 src/moria/fortran_compile/Makefile.txt
+src/moria/fortran_compile/VI_HST_ogle_man_match4.f
+src/moria/fortran_compile/cal_star_num_2_MATCHUP.f
 src/moria/fortran_compile/convert_C1K1C.F
+src/moria/fortran_compile/fit_HST_IV_ogle_col.f
 src/moria/fortran_compile/img2extract_wfc3uv_psflist.F
 src/moria/fortran_compile/img2sam_wfc3uv_379.F
 src/moria/fortran_compile/img2xym_wfc3uv.F
 src/moria/fortran_compile/mcmc_expand_average.F
+src/moria/fortran_compile/psf_star_mags_mcmc.f
 src/moria/fortran_compile/uvp2psf_simst.F
 src/moria/fortran_compile/uvp2psf_simstV.F
 src/moria/fortran_compile/uvp2tri_scon_fs_asym_mcmc.F
