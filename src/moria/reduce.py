@@ -82,7 +82,21 @@ def data_prep_early(destination):
 
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "07.CALIBRATION", filename="psf_star_mags_mcmc.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "07.CALIBRATION", filename="cal_star_num_2_MATCHUP.xOg")
-    
+
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "05.KECK_TRANS", filename="matched_HST_Keck_stars.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "05.KECK_TRANS", filename="HST_Keck_coord_trans.xOg")
+
+
+def data_prep_module_five(destination):
+    fortran_src = get_fortran_dir()
+    copy_entire_files(source=Path(destination).resolve() / "01.XYM" / "F814W", destination=Path(destination).resolve() / "05.KECK_TRANS", filename="outputq_F814W.fits")
+    copy_entire_files(source=Path(destination).resolve() / "01.XYM" / "F606W", destination=Path(destination).resolve() / "05.KECK_TRANS", filename="outputq_F606W.fits")
+
+    copy_entire_files(source=Path(destination).resolve() / "02.CMD", destination=Path(destination).resolve() / "05.KECK_TRANS", filename="MATCHUP.F814W.XYM.02")
+    copy_entire_files(source=Path(destination).resolve() / "02.CMD", destination=Path(destination).resolve() / "05.KECK_TRANS", filename="MATCHUP.F606W.XYM")
+
+
+
 def run_xgf_conversion(directory, script='run_convert_C1K1C.src'):
     """
     Run the conversion script on _flc files in F814W and F606W subdirectories.
@@ -491,6 +505,106 @@ def loc_trans(directory):
     run_xym2mat(directory)
     run_img2extract_wfc3uv_psflist(directory)
     run_img2extract_wfc3uv_psflist_Cal(directory)
+
+
+def keck_trans(directory):
+    """
+    Run the Keck transformation scripts in F814W and F606W subdirectories.
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory containing 00.DATA/ and 01.XYM/ folders.
+
+    Returns
+    -------
+    Produces pixel data for PSF generation.
+    """
+
+    def run_matched_HST_Keck_stars_F814W(directory, script='run_matched_HST_Keck_stars_F814W.src'):
+        """Produces matched HST keck stars."""
+        log_file = Path(directory).resolve() / "05.KECK_TRANS" / "log_files" / f"run_matched_HST_Keck_stars_F814W.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "05.KECK_TRANS"
+                subdir = base_dir
+                script_path = subdir / script
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+
+    def run_matched_HST_Keck_stars_F606W(directory, script='run_matched_HST_Keck_stars_F606W.src'):
+        """Produces matched HST keck stars."""
+        log_file = Path(directory).resolve() / "05.KECK_TRANS" / "log_files" / f"run_matched_HST_Keck_stars_F606W.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "05.KECK_TRANS"
+                subdir = base_dir
+                script_path = subdir / script
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+
+    def run_HST_Keck_coord_trans_F814W(directory, script='run_HST_Keck_coord_trans_F814W.src'):
+        """Produces matched HST keck stars."""
+        log_file = Path(directory).resolve() / "05.KECK_TRANS" / "log_files" / f"run_HST_Keck_coord_trans_F814W.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "05.KECK_TRANS"
+                subdir = base_dir
+                script_path = subdir / script
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+
+    def run_HST_Keck_coord_trans_F606W(directory, script='run_HST_Keck_coord_trans_F606W.src'):
+        """Produces matched HST keck stars."""
+        log_file = Path(directory).resolve() / "05.KECK_TRANS" / "log_files" / f"run_HST_Keck_coord_trans_F606W.log"
+        with open(log_file, "w") as logf:
+            try:
+                base_dir = Path(directory).resolve() / "05.KECK_TRANS"
+                subdir = base_dir
+                script_path = subdir / script
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
+            finally:
+                sys.stdout = sys.__stdout__
+                sys.stderr = sys.__stderr__
+
+    run_matched_HST_Keck_stars_F814W(directory)
+    run_matched_HST_Keck_stars_F606W(directory)
+    run_HST_Keck_coord_trans_F814W(directory)
+    run_HST_Keck_coord_trans_F606W(directory)
+
 
 
 def cmd_partition_matchup_raw_lines(path: Path):
