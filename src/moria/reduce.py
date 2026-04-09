@@ -23,16 +23,6 @@ import re
 
 parser = argparse.ArgumentParser()
 
-
-"""
-The HST fly star reduction pipeline depends on a certain directory structure.
-
-<root_dir>/
-    00.DATA/
-    01.XYM/
-"""
-
-
 def get_fortran_dir():
     """
     Return the path to the compiled Fortran executables bundled with MORIA.
@@ -135,16 +125,6 @@ def run_xgf_conversion(directory, script='run_convert_C1K1C.src'):
 def data_prep(directory):
     """
     Preparae IN.* files in respective files using _WJ2.fits files in 00.DATA
-    Parameters
-    ----------
-    directory - The root directory to operate on. There is a specific directory
-    structure that is expected within <dir>:
-        00.DATA/
-        01.XYM/
-
-    Returns
-    -------
-    several IN.* files.
     """
     
         
@@ -513,25 +493,64 @@ def loc_trans(directory):
     run_img2extract_wfc3uv_psflist_Cal(directory)
 
 
+def cmd_partition_matchup_raw_lines(path: Path):
+    """Split MATCHUP into preamble (# / blank) and data rows; omit xym2bar echo lines (fixed-width data unchanged)."""
+
+    def _is_xym2bar_echo(line: str) -> bool:
+        """Echo of xym2bar's command/input deck — drop; keep real column # headers."""
+        s = line.strip()
+        if not s.startswith("#"):
+            return False
+        inner = s.lstrip("#").strip()
+        if inner and re.fullmatch(r"[-]+", inner):
+            return True
+        up = inner.upper()
+        return up.startswith("ARG") or up.startswith("INP")
+
+    preamble, data = [], []
+    with path.open(encoding="utf-8", errors="replace") as f:
+        for line in f:
+            s = line.rstrip("\r\n")
+            if not s.strip():
+                preamble.append(s)
+            elif s.lstrip().startswith("#"):
+                if _is_xym2bar_echo(s):
+                    continue
+                preamble.append(s)
+            else:
+                data.append(s)
+    return preamble, data
+
+
+def cmd_write_matchup_raw_lines(path: Path, preamble: list[str], data: list[str]) -> None:
+    path.write_text("\n".join(preamble + data) + "\n", encoding="utf-8")
+
+
+def cmd_rewrite_matchup_drop_xym2bar_echo(path: Path) -> None:
+    """Rewrite file without xym2bar echoes (same data line bytes)."""
+    if not path.is_file():
+        return
+    pre, dat = _cmd_partition_matchup_raw_lines(path)
+    _cmd_write_matchup_raw_lines(path, pre, dat)
+
+
 def cmd_diagram(directory):
 
-    copy_files(source=Path(directory).resolve() / "01.XYM" / "F814W", destination=Path(directory).resolve() / "02.CMD", extensions=[".02"])
-    copy_files(source=Path(directory).resolve() / "01.XYM" / "F606W", destination=Path(directory).resolve() / "02.CMD", extensions=[".XYM"])
+    fortran_src = get_fortran_dir()
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "01.XYM" / "F814W", filename="MATCHUP.F814W.XYM.02")
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "01.XYM" / "F606W", filename="MATCHUP.F606W.XYM")
+
     subdir = Path(directory).resolve() / "02.CMD"
-    #script_path = Path(directory).resolve() / "02.CMD" / "cmd_plot.py"
-    #import numpy as np
-    #import matplotlib.pyplot as plt
-    
-    #Load the MATCHUP files
-    
-    
-    #xv, yv, mv are the x, y and magnitudes for the V band. Same logic for the I band
-    
-    xv, yv, mv = np.loadtxt(Path(directory).resolve() / "02.CMD" / "MATCHUP.F606W.XYM", unpack=True, usecols=(0,1,2))
-    xi, yi, mi = np.loadtxt(Path(directory).resolve() / "02.CMD" / "MATCHUP.F814W.XYM.02", unpack=True, usecols=(0,1,2))
+    path_match_I = subdir / "MATCHUP.F814W.XYM.02"
+    path_match_V = subdir / "MATCHUP.F606W.XYM"
+
+    cmd_rewrite_matchup_drop_xym2bar_echo(path_match_I)
+    cmd_rewrite_matchup_drop_xym2bar_echo(path_match_V)
+
+    xv, yv, mv = np.loadtxt(path_match_V, unpack=True, usecols=(0, 1, 2))
+    xi, yi, mi = np.loadtxt(path_match_I, unpack=True, usecols=(0, 1, 2))
     
     #Establish target parameters
-    
     response = str(input("Do you have a target? Enter 'Yes' if you do."))
     if response == 'yes' or response == 'Yes':
         xtarg = float(input("Enter x-coord of your target"))
@@ -545,7 +564,25 @@ def cmd_diagram(directory):
 #        xtarg, ytarg = 535.2320, 623.8950
 #        Vtarg, Itarg = -10.2651, -10.3052
     VmItarg = Vtarg - Itarg
-    
+
+    # If the user supplied a target, put that star first in the MATCHUP files (preserve fixed-width lines).
+    if response == "yes" or response == "Yes":
+        path_I = path_match_I
+        path_V = path_match_V
+        preamble_I, lines_I = cmd_partition_matchup_raw_lines(path_I)
+        preamble_V, lines_V = cmd_partition_matchup_raw_lines(path_V)
+        n = len(xi)
+        dist2 = (xi - xtarg) ** 2 + (yi - ytarg) ** 2
+        idx = int(np.argmin(dist2))
+        order_list = [idx] + [i for i in range(n) if i != idx]
+        if idx != 0:
+            reordered_I = [lines_I[i] for i in order_list]
+            reordered_V = [lines_V[i] for i in order_list]
+            cmd_write_matchup_raw_lines(path_I, preamble_I, reordered_I)
+            cmd_write_matchup_raw_lines(path_V, preamble_V, reordered_V)
+        xv, yv, mv = np.loadtxt(path_V, unpack=True, usecols=(0, 1, 2))
+        xi, yi, mi = np.loadtxt(path_I, unpack=True, usecols=(0, 1, 2))
+
     #Function to find the CMD of the target and get our list of Sim+Ref stars.
 
     def show_cmd_targ(directory, response, xi, yi, xv, yv, mi, mv):
@@ -1670,7 +1707,6 @@ def fit_calibration(directory):
     """
     The goal here is to calibrate the HST photometry to the OGLE-III database.
     """
-
     def fit_HST_IV_ogle_col_1(directory, script='run_fit_HST_IV_ogle_col_1.src'):
         
         log_file = Path(directory).resolve() / "07.CALIBRATION" / "log_files" / f"run_fit_VI_HST_ogle_man_match4.log"
