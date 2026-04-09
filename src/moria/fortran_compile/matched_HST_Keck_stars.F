@@ -1,7 +1,7 @@
        program matched_HST_Keck_stars
 
        IMPLICIT DOUBLE PRECISION (A-H,O-Z)
-       parameter(maxKeck=1000,maxHST=10000)
+       parameter(maxKeck=3000,maxHST=10000)
        double precision xk(maxKeck),yk(maxKeck),mk(maxKeck)
        double precision mksig(maxKeck)
        double precision xh(maxHST),yh(maxHST),
