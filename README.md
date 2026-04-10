@@ -1,5 +1,8 @@
 # MORIA: Microlensing Object high-Resolution Imaging Analysis (MORIA)
 
+![Logo](new_logo)
+
+
 ## How to Install
 
 The easiest way to install this code is to first clone it. You can do this by running the command below:
