@@ -1,6 +1,6 @@
 # MORIA: Microlensing Object high-Resolution Imaging Analysis (MORIA)
 
-![Logo](new_logo)
+![Logo](https://github.com/10ay/MORIA/blob/main/new_logo.png)
 
 
 ## How to Install
