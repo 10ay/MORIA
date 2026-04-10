@@ -644,15 +644,15 @@ def cmd_rewrite_matchup_drop_xym2bar_echo(path: Path) -> None:
     """Rewrite file without xym2bar echoes (same data line bytes)."""
     if not path.is_file():
         return
-    pre, dat = _cmd_partition_matchup_raw_lines(path)
-    _cmd_write_matchup_raw_lines(path, pre, dat)
+    pre, dat = cmd_partition_matchup_raw_lines(path)
+    cmd_write_matchup_raw_lines(path, pre, dat)
 
 
 def cmd_diagram(directory):
 
-    fortran_src = get_fortran_dir()
-    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "01.XYM" / "F814W", filename="MATCHUP.F814W.XYM.02")
-    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "01.XYM" / "F606W", filename="MATCHUP.F606W.XYM")
+#    fortran_src = get_fortran_dir()
+    copy_entire_files(source=Path(directory).resolve() / "01.XYM" / "F814W", destination=Path(directory).resolve() / "02.CMD", filename="MATCHUP.F814W.XYM.02")
+    copy_entire_files(source=Path(directory).resolve() / "01.XYM" / "F606W", destination=Path(directory).resolve() / "02.CMD", filename="MATCHUP.F606W.XYM")
 
     subdir = Path(directory).resolve() / "02.CMD"
     path_match_I = subdir / "MATCHUP.F814W.XYM.02"
