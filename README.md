@@ -10,9 +10,9 @@ The easiest way to install this code is to first clone it. You can do this by ru
 
 Once installed, navigate to inside the MORIA folder and run:
 
-    pip install -e
+    pip install -e .
 
-Git clone the repository, and run 'pip install -e' in the src folder. 
+Git clone the repository, and run 'pip install -e .' in the src folder. Don't forget the dot after the '-e'. 
 
 ## Tutorial
 
