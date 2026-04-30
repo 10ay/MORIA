@@ -56,8 +56,10 @@ c------------------------------------
 c
 c
  
-#define _PIXOUTX_   1250
-#define _PIXOUTY_   1250
+c Full WFC3/UVIS chip mosaic is 4096x4096; 1250x1250 was a downsampled
+c stack size from the original pipeline. Match input _WJ2.fits extent.
+#define _PIXOUTX_   4096
+#define _PIXOUTY_   4096
 #define _F_            1
 #define _XOFF_      0000
 #define _YOFF_      0000
@@ -100,6 +102,9 @@ c
       integer i, j
       integer ii,jj
       integer ir,jr
+      integer i0,j0
+      real*8  fx,fy,psamp
+      logical lvalid
       real*8  plist(_NIMS_)
       character clist(99999)
       real*8 bar,sig
@@ -262,11 +267,8 @@ c        enddo
  
 c--------------------------------------------------------
 c
-c 4096x4096 are the dimensions of the output image;
-c sometimes it may be better to make a larger image,
-c but that will be complicated as I have been using pixo
-c for dual purposes (above).  Below, go through the
-c pixels one by one, find out which one
+c Output raster is _PIXOUTX_ x _PIXOUTY_ (see defines above; full frame 4096).
+c Below, go through the pixels one by one, find out which one
 c
       do j = 0001+0000,_PIXOUTY_-0000
       do i = 0001+0000,_PIXOUTX_-0000
@@ -280,22 +282,42 @@ c
             yc = 2048.00 + CG(NIM)*(xref-2048.00-XOFF(NIM))
      .                   + DG(NIM)*(yref-2048.00-YOFF(NIM))
             call wfc3uv_cgj(xc,yc,0,IFILT(NIM),xr,yr)
-            ir = int(xr+0.5)  ! pixel location in image # NIM
-            jr = int(yr+0.5)  ! (I don't do any interpolation here)
-c            if (i.eq.(_PIXOUTX_)/2) then
-c                write(*,114) i,j,NIM,ir,jr,NL
-c                endif
-            if (ir.ge.1.and.ir.le.4096.and.
-     .          jr.ge.1.and.jr.le.4096) then
+c           Bilinear interpolation at (xr,yr); fallback to nearest pixel.
+            ir = int(xr+0.5d0)
+            jr = int(yr+0.5d0)
+            i0 = int(xr)
+            j0 = int(yr)
+            if (i0.lt.1) i0 = 1
+            if (j0.lt.1) j0 = 1
+            if (i0.ge.4096) i0 = 4095
+            if (j0.ge.4096) j0 = 4095
+            fx = xr - dble(i0)
+            fy = yr - dble(j0)
+            lvalid = .false.
+            if (pixnima(i0  ,j0  ,NIM).gt.-32700.and.
+     .          pixnima(i0+1,j0  ,NIM).gt.-32700.and.
+     .          pixnima(i0  ,j0+1,NIM).gt.-32700.and.
+     .          pixnima(i0+1,j0+1,NIM).gt.-32700) then
+                psamp = (1.d0-fx)*(1.d0-fy)
+     .                 * (dble(pixnima(i0  ,j0  ,NIM))+32000.d0)
+     .                 + fx*(1.d0-fy)
+     .                 * (dble(pixnima(i0+1,j0  ,NIM))+32000.d0)
+     .                 + (1.d0-fx)*fy
+     .                 * (dble(pixnima(i0  ,j0+1,NIM))+32000.d0)
+     .                 + fx*fy
+     .                 * (dble(pixnima(i0+1,j0+1,NIM))+32000.d0)
+                lvalid = .true.
+            elseif (ir.ge.1.and.ir.le.4096.and.
+     .              jr.ge.1.and.jr.le.4096) then
                 if (pixnima(ir,jr,NIM).gt.-32700) then
-                   NL = NL + 1
-                   plist(NL) = pixnima(ir,jr,NIM   ) + 32000.0
-                   clist(NL) = ' '
-c                  if (i.eq.(_PIXOUTX_)/2) then
-c                     write(*,114) i,j,NIM,ir,jr,NL,plist(NL)
-c114                  format(10x,3x,2i5,3x,i2,1x,2i5,1x,i2,1x,f10.2)
-c                     endif
+                   psamp = dble(pixnima(ir,jr,NIM))+32000.d0
+                   lvalid = .true.
                    endif
+                endif
+            if (lvalid) then
+                   NL = NL + 1
+                   plist(NL) = psamp
+                   clist(NL) = ' '
                 endif
             enddo
  
@@ -316,7 +338,7 @@ c                     endif
      .                 FIX,(int(plist(n)),clist(n),n=1,NL)
  111     format(f8.2,1x,f8.2,1x,i4.4,1x,i4.4,1x,
      .          i2,1x,i2,1x,i6,1x,i4,1x,a3,5x,50(i5,a))
-         pixo(i,j) = int(bar)-32000
+         pixo(i,j) = nint(bar)-32000
          if (NL.eq.0) pixo(i,j) = -32750
  
  137     continue

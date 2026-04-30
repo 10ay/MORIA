@@ -7306,7 +7306,10 @@ c--------------------------------------------------------------------
       integer NMAT
       integer matmeth
       integer NIT
- 
+      integer NINMIN
+      integer NSEEDBUOY
+      integer NMINBUOY
+
       if (NITREJ.lt.1.or.NITREJ.gt.25) then
          print*,'NITREJ: ',NITREJ
          print*,'NEW MIRMAT FORMAT...'
@@ -7338,7 +7341,22 @@ c--------------------------------------------------------------------
          endif
  
       matmeth = 0
- 
+
+c     Matching thresholds: LOC_TRANS may use a small master list (e.g. nearby
+c     reference stars). The original hard thresholds (>=10, and/or >=50% of
+c     list size) can reject valid seeds and lead to empty MAT files.
+      NINMIN = min(NIN1,NIN2)
+      NSEEDBUOY = 10
+      NMINBUOY  = 10
+      if (NINMIN.le.60) then
+         NSEEDBUOY = 5
+         NMINBUOY  = 2
+         endif
+      if (NINMIN.le.25) then
+         NSEEDBUOY = 3
+         NMINBUOY  = 2
+         endif
+         
       if (NBUOY.eq.0) then
          print*,' '
          print*,'SEE IF THE STANDARD FILE "MIRMAT.HELP" IS AVAILABLE'
@@ -7403,9 +7421,7 @@ c
       print*,'MM:                      '
  
       print*,'MM:  '
-      if ((NBUOY.ge.0.50*NIN1.or.
-     .    (NBUOY.ge.0.50*NIN2)).and.
-     .     NBUOY.ge.05) goto 999 ! good! we have found enough matches
+      if (NBUOY.ge.NSEEDBUOY) goto 999 ! good! we have found enough matches
       NBUOY = 0
  
 c-------------------------------------------
@@ -7425,11 +7441,11 @@ c
       print*,'MM:  '
       print*,'MM: MM TEST2: found:  ',NBUOY
       print*,'MM:  '
-      if (NBUOY.ge.10) goto 999
+      if (NBUOY.ge.NSEEDBUOY) goto 999
       print*,'MM:  '
       print*,'MM:  '
- 
- 
+
+
 c-------------------------------------------
 c TEST #3
 c-------------------------------------------
@@ -7447,9 +7463,9 @@ c
       print*,'MM:   '
       print*,'MM: MM TEST3:  found:  ',NBUOY
       print*,'MM:   '
-      if (NBUOY.ge.10) goto 999
- 
- 
+      if (NBUOY.ge.NSEEDBUOY) goto 999
+
+
 c-------------------------------------------
 c TEST #4
 c-------------------------------------------
@@ -7468,9 +7484,9 @@ c
       print*,'MM:   '
       print*,'MM: MM TEST4: found:   ',NBUOY
       print*,'MM:   '
-      if (NBUOY.gt.10) goto 999
- 
- 
+      if (NBUOY.ge.NSEEDBUOY) goto 999
+
+
 c-------------------------------------------
 c TEST #5
 c-------------------------------------------
@@ -7487,7 +7503,7 @@ c
      .                     xin2,yin2,min2,NIN2,
      .                     x1b,y1b,m1b,x2b,y2b,m2b,NBUOY)
       print*,'MM: MM TEST6: found:  ',NBUOY
-      if (NBUOY.ge.05) goto 999
+      if (NBUOY.ge.NSEEDBUOY) goto 999
  
  
       print*,'MM: MM ---> '
@@ -7595,7 +7611,7 @@ c
       print*,'MM: NBUOY: ',NBUOY
       print*,'MM:  '
  193  format(1x,a11,2f11.2)
-      if (NBUOY.lt.10) then
+      if (NBUOY.lt.NMINBUOY) then
          if (matmeth.eq.1) goto 112
          if (matmeth.eq.2) goto 113
          if (matmeth.eq.3) goto 114
@@ -8921,7 +8937,8 @@ c
       integer iang
       integer ma, mb, NL, NLs
       integer nfmx, namx
- 
+      integer iang2
+
       integer nvote(500)
       integer mvote(500)
       integer ivote(500)
@@ -8943,10 +8960,16 @@ c
       integer NUSEB
  
       integer NIN1u, NIN2u
- 
- 
+      integer N1A, N2A
+  
+  
       NUSEA = 100
       NUSEB = 200
+c     For small reference lists (e.g. LOC_TRANS uses a nearby-star list),
+c     insistence on 100/200 can cause MM5C to bail out unnecessarily.
+c     ord_brite only needs a modest number of bright stars; adapt to NIN sizes.
+      if (NIN1.lt.NUSEA) NUSEA = NIN1
+      if (NIN2.lt.NUSEB) NUSEB = NIN2
  
       print*,'MM5C: '
       print*,'MM5C:  use brightest stars'
@@ -8972,17 +8995,27 @@ c
       print*,'MM5C: ORDBRITE1: ',NIN1,NIN1u
       call ord_brite(xin2,yin2,min2,NIN2,x2,y2,m2,NIN2u,NUSEB)
       print*,'MM5C: ORDBRITE2: ',NIN2,NIN2u
- 
- 
+
+c     Only the first NIN*u entries of x1/x2 are defined by ORDBRITE.
+c     The original code looped 1..250 regardless, so x1(>NIN1u) were
+c     left at 0, corrupting the offset mask and all MM5C voting.
+      N1A = NIN1u
+      N2A = NIN2u
+      if (N1A.gt.250) N1A = 250
+      if (N2A.gt.250) N2A = 250
+      if (N1A.lt.1) N1A = 1
+      if (N2A.lt.1) N2A = 1
+  
+  
       do ia = 1, 801
       do ib = 1, 801
          mask(ia,ib) = 0
          enddo
          enddo
-      do na = 1, 250
+      do na = 1, N1A
          nmask = 0
          bmask = 0
-         do NB = 1, NIN1
+         do nb = 1, NIN1
             xa = x1(na)
             ya = y1(na)
             xb = xin1(nb)
@@ -9011,7 +9044,7 @@ c
          enddo
  
       print*,'MM5C:  voting results'
-      do ma = 1, 250
+      do ma = 1, N2A
          nfmx = 0
          namx = 0
          agmx = 0
@@ -9036,7 +9069,7 @@ c
             enddo
          do iang = 0000, 3600, 1
             ang = iang*0.1
-            do n = 1, 250
+            do n = 1, N1A
                nvote(n) = 0
                enddo
             angr = ang/180*3.1415927
@@ -9070,27 +9103,48 @@ c
          if (iang.lt.001) iang = iang + 360
          if (iang.gt.361) iang = iang - 360
  
-         call rcosort2ii(mvote,ivote,250,10)
+         call rcosort2ii(mvote,ivote,N1A,10)
  
          if (agmx.lt.1) agmx = agmx+360.0
          iang = agmx-0.5
          if (iang.lt.001) iang = iang + 360
          if (iang.gt.361) iang = iang - 360
+         if (N1A.ge.2) then
          if (mvote(1).gt.2*mvote(2))
      .   lvote(iang) = lvote(iang)+1
+         else
+         if (N1A.ge.1.and.mvote(1).ge.2)
+     .   lvote(iang) = lvote(iang)+1
+         endif
  
  
          iang = agmx+0.5
          if (iang.lt.001) iang = iang + 360
          if (iang.gt.361) iang = iang - 360
+         if (N1A.ge.2) then
          if (mvote(1).gt.2*mvote(2))
      .   lvote(iang) = lvote(iang)+1
+         else
+         if (N1A.ge.1.and.mvote(1).ge.2)
+     .   lvote(iang) = lvote(iang)+1
+         endif
  
          iang = agmx
          if (iang.lt.001) iang = iang + 360
          if (iang.gt.361) iang = iang - 360
- 
- 
+         iang2 = 0
+         if (nfmx.gt.0.and.namx.gt.0) then
+            iang2 = nint(agmx)
+            if (iang2.lt.1) iang2 = iang2 + 360
+            if (iang2.gt.360) iang2 = iang2 - 360
+            lsave(ma) = iang2
+            msave(ma) = namx
+         else
+            lsave(ma) = 0
+            msave(ma) = 0
+         endif
+
+
 c         write(*,194) ma,x2(ma),y2(ma),m2(ma),
 c     .                NLs,lvote(iang),iang,
 c     .                nfmx,namx,agmx,
@@ -9098,18 +9152,15 @@ c     .                (mvote(n),n=1,10)
 c 194     format(10x,i3,1x,3f8.2,1x,
 c     .              5i6,1x,f6.1,1x,10i4)
  
-         lsave(ma) = iang
-         msave(ma) = ivote(1)
- 
-         if (lvote(iang).ge.5) then
+         if (iang2.gt.0.and.lvote(iang2).ge.5) then
             print*,'MM5C: ---> WE HAVE 10+ VOTES FOR MATCHES!'
-            print*,'MM5C: ---> iang: ',iang
-            print*,'MM5C: ---> lvot: ',lvote(iang)
+            print*,'MM5C: ---> iang: ',iang2
+            print*,'MM5C: ---> lvot: ',lvote(iang2)
             NBUOY = 0
             do m = 1, ma
-               if (abs(lsave(m)-iang    ).le.1.or.
-     .             abs(lsave(m)-iang-360).le.1.or.
-     .             abs(lsave(m)-iang+360).le.1) then
+               if (abs(lsave(m)-iang2  ).le.1.or.
+     .             abs(lsave(m)-iang2-360).le.1.or.
+     .             abs(lsave(m)-iang2+360).le.1) then
                       NBUOY = NBUOY + 1
                       na = msave(m)
                       x1b(NBUOY) = x1(na)
@@ -9129,11 +9180,11 @@ c 114                  format(3i5,1x,6f8.2)
             endif
  
          enddo!ma
- 
+
       NBUOY = 0
- 
+
       return
- 
+
       end
  
  

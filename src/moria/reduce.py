@@ -141,6 +141,38 @@ def data_prep(directory):
     Preparae IN.* files in respective files using _WJ2.fits files in 00.DATA
     """
     
+    def _estimate_nstars_from_xym(path: Path, max_lines: int = 200000) -> int:
+        """
+        Rough estimate of number of sources in an .xym file.
+        Ignores blank lines and comment lines (starting with '#').
+        """
+        try:
+            n = 0
+            with path.open("r", encoding="utf-8", errors="ignore") as fh:
+                for i, line in enumerate(fh):
+                    if i >= max_lines:
+                        break
+                    s = line.strip()
+                    if not s or s.startswith("#"):
+                        continue
+                    n += 1
+            return n
+        except OSError:
+            return 0
+
+    def _choose_mag_clip_for_xym(xym_path: Path, default_clip: str) -> str:
+        """
+        Pick a more inclusive magnitude clip for sparse lists.
+        Instrumental magnitudes are negative; "mA,B" keeps A < m < B.
+        """
+        nstars = _estimate_nstars_from_xym(xym_path)
+        if nstars and nstars < 200:
+            if default_clip == "m-13.75,-8.5":
+                return "m-13.75,-6.0"
+            if default_clip == "m-14.75,-5.5":
+                return "m-14.75,-3.5"
+        return default_clip
+        
         
     def data_prep_F814W(directory, f= 'F814W'):
         base_dir = Path(directory).resolve()
@@ -156,6 +188,11 @@ def data_prep(directory):
         base_dir_one = base_dir / '01.XYM'/ f
         files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])
         files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.fits')])
+
+        default_clip = "m-13.75,-8.5"
+        clip = default_clip
+        if files:
+            clip = _choose_mag_clip_for_xym(base_dir_one / files[0], default_clip)
 
 
         
@@ -174,8 +211,8 @@ def data_prep(directory):
             f.write("#00 MATCHUP.XYM.01 c0\n")
             for i, filename in enumerate(files, start=1):
                 if i == 1:
-                    f.write(f"{0:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
-                f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
+                    f.write(f"{0:02d} {filename} c8 f8 \"{clip}\" \n")
+                f.write(f"{i:02d} {filename} c8 f8 \"{clip}\" \n")
 
 
         with open(output_file_xym2bar1, "w") as f:
@@ -193,7 +230,7 @@ def data_prep(directory):
         with open(output_file_xym2mat2, "w") as f:
             f.write("00 MATCHUP.XYM.01 c0\n")
             for i, filename in enumerate(files, start=1):
-                f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
+                f.write(f"{i:02d} {filename} c8 f8 \"{clip}\" \n")
         return
     
     
@@ -208,6 +245,11 @@ def data_prep(directory):
         files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])
         files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.fits')])
 
+        default_clip = "m-14.75,-5.5"
+        clip = default_clip
+        if files:
+            clip = _choose_mag_clip_for_xym(base_dir_one / files[0], default_clip)
+
         
         output_file_dir = base_dir / '01.XYM' / f
         output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
@@ -217,7 +259,7 @@ def data_prep(directory):
         with open(output_file_xym2mat, "w") as f:
             f.write("00 MATCHUP.F814W.XYM.02 c0\n")
             for i, filename in enumerate(files, start=1):
-                f.write(f"{i:02d} {filename} c8 f6 \"m-14.75,-5.5\" \n")
+                f.write(f"{i:02d} {filename} c8 f6 \"{clip}\" \n")
 
 
         with open(output_file_xym2bar, "w") as f:
@@ -235,6 +277,39 @@ def data_prep(directory):
     
     data_prep_F814W(directory)
     data_prep_F606W(directory)
+    
+def _count_wj2_xym(field_dir: Path) -> int:
+    """Number of WFC3 *WJ2.xym lists in 01.XYM/Filter (one per exposure/stack)."""
+    if not field_dir.is_dir():
+        return 0
+    return len(sorted(field_dir.glob("*WJ2.xym")))
+
+
+def _write_xym2bar_run_scripts(field_root: Path) -> None:
+    """
+    xym2bar's first argument is NIMMIN
+    """
+    # F814W scripts (produce MATCHUP.XYM.01/02 and MATCHUP.F814W.XYM.02)
+    fdir_I = (field_root / "01.XYM" / "F814W").resolve()
+    nexp_I = _count_wj2_xym(fdir_I)
+    if nexp_I >= 1:
+        nim_I = str(nexp_I)
+        (fdir_I / "run_xym2bar_1.src").write_text(f"cp -p IN.xym2bar.1 IN.xym2bar\n./xym2bar.xOg {nim_I}\ncp -p MATCHUP.XYMEEE MATCHUP.XYM.01\n", 
+        encoding="utf-8")
+        (fdir_I / "run_xym2bar_2.src").write_text(
+            f"cp -p IN.xym2bar.2 IN.xym2bar\n./xym2bar.xOg {nim_I}\n"
+            f"cp -p MATCHUP.XYMEEE MATCHUP.XYM.02\n"
+            f"cp -p MATCHUP.XYMEEE MATCHUP.F814W.XYM.02\n",
+            encoding="utf-8")
+
+    # F606W script (produces MATCHUP.F606W.XYM using I-band MATCHUP as input list)
+    fdir_V = (field_root / "01.XYM" / "F606W").resolve()
+    nexp_V = _count_wj2_xym(fdir_V)
+    if nexp_V >= 1:
+        nim_V = str(nexp_V)
+        # Keep "I" so xym2bar reads the NIM=0 input list from IN.xym2bar.
+        (fdir_V / "run_xym2bar.src").write_text(f"./xym2bar.xOg {nim_V} I DMATCH=8\ncp -p MATCHUP.XYMEEE MATCHUP.F606W.XYM\n", encoding="utf-8")
+
     
 def matchup_files(directory):
     """
@@ -327,6 +402,7 @@ def matchup_files(directory):
     copy_files(source=Path(directory).resolve() / "00.DATA" / "F606W", destination=Path(directory).resolve() / "01.XYM" / "F606W", extensions=[".fits"])
     run_img2xym(directory)
     data_prep(directory)
+    _write_xym2bar_run_scripts(Path(directory).resolve())
     run_xym2mat(directory)
     run_xym2bar(directory)
     run_xym2mat(directory, script='run_xym2mat_2.src')
@@ -378,7 +454,7 @@ def data_prep_loc_trans(directory, filters = 'F814W'):
 
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "03.LOC_TRANS" / filters)
     copy_files(source=Path(directory).resolve() / "01.XYM" / filters, extensions=[".xym"], destination=Path(directory).resolve() / "03.LOC_TRANS" / filters)
-    copy_files(source=Path(directory).resolve() / "01.XYM" / filters, extensions=[".fits"], destination=Path(directory).resolve() / "03.LOC_TRANS" / filters)
+    copy_files(source=Path(directory).resolve() / "01.XYM" / filters , extensions=[".fits"], destination=Path(directory).resolve() / "03.LOC_TRANS" / filters)
 
     base_dir = Path(directory).resolve()
 
@@ -388,8 +464,8 @@ def data_prep_loc_trans(directory, filters = 'F814W'):
 
     base_dir_one = base_dir / '01.XYM'/ filters
     f=filters
-    files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.xym')])    
-    files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('WJ2.fits')])    
+    files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('_flc.xym')])    
+    files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('_flc.fits')])    
     output_file_dir = base_dir / '03.LOC_TRANS' / f
 
     output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
@@ -651,19 +727,14 @@ def cmd_rewrite_matchup_drop_xym2bar_echo(path: Path) -> None:
 def cmd_diagram(directory):
 
 #    fortran_src = get_fortran_dir()
-    copy_entire_files(source=Path(directory).resolve() / "01.XYM" / "F814W", destination=Path(directory).resolve() / "02.CMD", filename="MATCHUP.F814W.XYM.02")
-    copy_entire_files(source=Path(directory).resolve() / "01.XYM" / "F606W", destination=Path(directory).resolve() / "02.CMD", filename="MATCHUP.F606W.XYM")
+    copy_entire_files(source=Path(directory).resolve() / "01.XYM", destination=Path(directory).resolve() / "02.CMD", filename="master_go17776_STEP08_A.xyvieeee")
 
     subdir = Path(directory).resolve() / "02.CMD"
-    path_match_I = subdir / "MATCHUP.F814W.XYM.02"
-    path_match_V = subdir / "MATCHUP.F606W.XYM"
-
-    cmd_rewrite_matchup_drop_xym2bar_echo(path_match_I)
-    cmd_rewrite_matchup_drop_xym2bar_echo(path_match_V)
-
-    xv, yv, mv = np.loadtxt(path_match_V, unpack=True, usecols=(0, 1, 2))
-    xi, yi, mi = np.loadtxt(path_match_I, unpack=True, usecols=(0, 1, 2))
-    
+    path_match_I = subdir / "dex_no_gaia_STEP08_A.xyvieeee"
+    #cmd_rewrite_matchup_drop_xym2bar_echo(path_match_I)
+    xv, yv, mv, mi = np.loadtxt(path_match_I, unpack=True, usecols=(0, 1, 2, 3))
+    xi = xv
+    yi = yv
     #Establish target parameters
     response = str(input("Do you have a target? Enter 'Yes' if you do."))
     if response == 'yes' or response == 'Yes':
@@ -682,20 +753,21 @@ def cmd_diagram(directory):
     # If the user supplied a target, put that star first in the MATCHUP files (preserve fixed-width lines).
     if response == "yes" or response == "Yes":
         path_I = path_match_I
-        path_V = path_match_V
+        #path_V = path_match_V
         preamble_I, lines_I = cmd_partition_matchup_raw_lines(path_I)
-        preamble_V, lines_V = cmd_partition_matchup_raw_lines(path_V)
+        #preamble_V, lines_V = cmd_partition_matchup_raw_lines(path_V)
         n = len(xi)
         dist2 = (xi - xtarg) ** 2 + (yi - ytarg) ** 2
         idx = int(np.argmin(dist2))
         order_list = [idx] + [i for i in range(n) if i != idx]
         if idx != 0:
             reordered_I = [lines_I[i] for i in order_list]
-            reordered_V = [lines_V[i] for i in order_list]
+            #reordered_V = [lines_V[i] for i in order_list]
             cmd_write_matchup_raw_lines(path_I, preamble_I, reordered_I)
-            cmd_write_matchup_raw_lines(path_V, preamble_V, reordered_V)
-        xv, yv, mv = np.loadtxt(path_V, unpack=True, usecols=(0, 1, 2))
-        xi, yi, mi = np.loadtxt(path_I, unpack=True, usecols=(0, 1, 2))
+            #cmd_write_matchup_raw_lines(path_V, preamble_V, reordered_V)
+        xv, yv, mv, mi = np.loadtxt(path_match_I, unpack=True, usecols=(0, 1, 2, 3))
+        xi = xv
+        yi = yv
 
     #Function to find the CMD of the target and get our list of Sim+Ref stars.
 

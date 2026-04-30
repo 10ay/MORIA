@@ -1,0 +1,14 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     HST_Keck_coord_trans.xOg
+relocations:
+  - { offset: 0x1A, size: 0x8, addend: 0x0, symName: _indexx_, symObjAddr: 0x0, symBinAddr: 0x1000005D8, symSize: 0x2BC }
+  - { offset: 0x57, size: 0x8, addend: 0x0, symName: _lenc_, symObjAddr: 0x5240, symBinAddr: 0x100005818, symSize: 0x98 }
+  - { offset: 0xCC, size: 0x8, addend: 0x0, symName: _sort_by_intensity_, symObjAddr: 0x49D8, symBinAddr: 0x100004FB0, symSize: 0x868 }
+  - { offset: 0x407, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x499C, symBinAddr: 0x100004F74, symSize: 0x3C }
+  - { offset: 0x44F, size: 0x8, addend: 0x0, symName: _MAIN__, symObjAddr: 0x3210, symBinAddr: 0x1000037E8, symSize: 0x178C }
+  - { offset: 0x9B1, size: 0x8, addend: 0x0, symName: _svdcmp_, symObjAddr: 0x1818, symBinAddr: 0x100001DF0, symSize: 0x19F8 }
+  - { offset: 0xC00, size: 0x8, addend: 0x0, symName: _svbksb_, symObjAddr: 0x14C4, symBinAddr: 0x100001A9C, symSize: 0x354 }
+  - { offset: 0xDB8, size: 0x8, addend: 0x0, symName: _fldtrans_, symObjAddr: 0x2BC, symBinAddr: 0x100000894, symSize: 0x1208 }
+  - { offset: 0x1261, size: 0x8, addend: 0x0, symName: _indexx_, symObjAddr: 0x0, symBinAddr: 0x1000005D8, symSize: 0x2BC }
+...

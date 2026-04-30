@@ -2005,7 +2005,9 @@ c
                   utot = utot + u_m(MM)
                   endif
                enddo
-            if (utot.le.2) stop 'utot.le.2'
+c           With NIM<=3, leave-one-out has utot<=2: skip outlier logic
+c           and use pooled mean/std below (label 2).
+            if (utot.le.2) goto 2
             zbar = ztot/utot
             ztot = 0.
             do MM = 1, Ms
@@ -2025,7 +2027,7 @@ c
          if (utot.ge.4) goto 1
          endif
 
-      ztot = 0.
+    2 ztot = 0.
       utot = 0
       do M = 1, Ms
          ztot = ztot + u_m(M)*z_m(M)
