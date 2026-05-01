@@ -56,9 +56,9 @@ def data_prep_early(destination):
     fortran_src = get_fortran_dir()
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xOg"])
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=[".xOg"])
-    copy_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM" / "F814W", extensions=[".xOg"])
-    copy_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM" / "F606W", extensions=[".xOg"])
-    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F814W", filename="xym2mat.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="dex_no_gaia.e")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="hst1pass.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="hst1pass.F")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F814W", filename="img2extract_wfc3uv_psflist.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F606W", filename="xym2mat.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F606W", filename="img2extract_wfc3uv_psflist.xOg")
@@ -316,101 +316,61 @@ def matchup_files(directory):
     Run the scripts to create MATCHUP Files on _WJ2 files in F814W and F606W subdirectories.
     """
 
-    def run_img2xym(directory, script='run_img2xym_wfc3uv.src'):
+    def reduce_wfc3(directory, script='reduce_wfc3.src'):
         """
-        Run img2xym_wfc3uv on exposures in the F814W subdirectory.
-        Produces .XYM files for each exposure using the PSFEFF_WFC3UV_F814W_C0.fits library PSF.
+        Run hst1pass on exposures in the F814W and F606W filters.
         """
-        log_file = Path(directory).resolve() / "01.XYM" / "log_files" / "run_img2xym_wfc3uv.log"
+        log_file = Path(directory).resolve() / "01.XYM" / "log_files" / "reduce_wfc3.log"
+        base_dir = Path(directory).resolve() / "01.XYM"
+        script_path = base_dir / script
         with open(log_file, "w") as logf:
-            sys.stdout = sys.stderr = logf
-            try:
-                base_dir = Path(directory).resolve() / "01.XYM"
-                filters = ['F814W', 'F606W']
+            subprocess.run(
+                ["bash", str(script_path)],
+                cwd=base_dir,
+                stdout=logf,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+                env=os.environ,
+            )
 
-                for f in filters:
-                    subdir = base_dir / f
-                    script_path = subdir / script if f == "F814W" else subdir / script
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__        
-
-    def run_xym2mat(directory, filters = ['F814W'], script='run_xym2mat_1.src'):
+    def no_gaia_matchup(directory, script='no_gaia_match.src'):
         """
-        Produces TRANS.xym2mat, as well as 16 MAT.0 files.
+        Write ``no_gaia_match.src`` and run ``dex_no_gaia.e`` on the four hst1pass lists
+        produced by ``reduce_wfc3`` (two ``*.F606W_xympquvwrd``, two ``*.F814W_xympquvwrd``
+        in ``01.XYM``).
         """
-        log_file = Path(directory).resolve() / "01.XYM" / "log_files" / f"{script.replace('.src','')}.log"
+        base_dir = Path(directory).resolve() / "01.XYM"
+        log_dir = base_dir / "log_files"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "matchup.log"
 
-        with open(log_file, "w") as logf:
-            sys.stdout = sys.stderr = logf
-            try:
-                base_dir = Path(directory).resolve() / "01.XYM"
-
-                for f in filters:
-                    subdir = base_dir / f
-                    script_to_use = script if f == 'F814W' else 'run_xym2mat_VI.src'
-                    script_path = subdir / script_to_use
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
-                    
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-        
-
-    def run_xym2bar(directory, filters = ['F814W'], script='run_xym2bar_1.src'):
-        """
-        Get a final list of photometry that allowed small zeropoint shifts for each exposure
-        """
-        log_file = Path(directory).resolve() / "01.XYM" / "log_files" / f"{script.replace('.src','')}.log"
+        f606 = sorted(base_dir.glob("*.F606W_xympquvwrd"))
+        f814 = sorted(base_dir.glob("*.F814W_xympquvwrd"))
+        if len(f606) != 2 or len(f814) != 2:
+            raise ValueError(
+                f"Need exactly 2 '*.F606W_xympquvwrd' and 2 '*.F814W_xympquvwrd'"
+                            )
+        names606 = [p.name for p in f606]
+        names814 = [p.name for p in f814]
+        line = "./dex_no_gaia.e " + " ".join(names606 + names814) + "\n"
+        script_path = base_dir / script
+        script_path.write_text(line, encoding="utf-8")
 
         with open(log_file, "w") as logf:
-            sys.stdout = sys.stderr = logf
-            try:
-                base_dir = Path(directory).resolve() / "01.XYM"
-                for f in filters:
-                    subdir = base_dir / f
-                    script_to_use = script if f == 'F814W' else 'run_xym2bar.src'
-                    script_path = subdir / script_to_use
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
+            subprocess.run(
+                ["bash", str(script_path)],
+                cwd=base_dir,
+                stdout=logf,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+                env=os.environ,
+            )
 
-    copy_files(source=Path(directory).resolve() / "00.DATA" / "F814W", destination=Path(directory).resolve() / "01.XYM" / "F814W", extensions=[".fits"])
-    copy_files(source=Path(directory).resolve() / "00.DATA" / "F606W", destination=Path(directory).resolve() / "01.XYM" / "F606W", extensions=[".fits"])
-    run_img2xym(directory)
-    data_prep(directory)
-    _write_xym2bar_run_scripts(Path(directory).resolve())
-    run_xym2mat(directory)
-    run_xym2bar(directory)
-    run_xym2mat(directory, script='run_xym2mat_2.src')
-    run_xym2bar(directory, script='run_xym2bar_2.src')
-    copy_files(source=Path(directory).resolve() / "01.XYM" / "F814W", destination=Path(directory).resolve() / "01.XYM" / "F606W", extensions=[".02"])
-    run_xym2mat(directory, filters = ['F606W'])
-    run_xym2bar(directory, filters = ['F606W'])
-
+    reduce_wfc3(directory)
+    no_gaia_matchup(directory)
+   
 
 def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
     """
@@ -727,7 +687,7 @@ def cmd_rewrite_matchup_drop_xym2bar_echo(path: Path) -> None:
 def cmd_diagram(directory):
 
 #    fortran_src = get_fortran_dir()
-    copy_entire_files(source=Path(directory).resolve() / "01.XYM", destination=Path(directory).resolve() / "02.CMD", filename="master_go17776_STEP08_A.xyvieeee")
+    copy_entire_files(source=Path(directory).resolve() / "01.XYM", destination=Path(directory).resolve() / "02.CMD", filename="dex_no_gaia_STEP08_A.xyvieeee")
 
     subdir = Path(directory).resolve() / "02.CMD"
     path_match_I = subdir / "dex_no_gaia_STEP08_A.xyvieeee"

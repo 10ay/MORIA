@@ -11,10 +11,10 @@ Requires-Dist: numpy
 Requires-Dist: astropy
 Requires-Dist: pandas
 Requires-Dist: matplotlib
+Provides-Extra: mast
+Requires-Dist: astroquery; extra == "mast"
 
 # MORIA: Microlensing Object high-Resolution Imaging Analysis (MORIA)
-
-To be able to run
 
 ## How to Install
 
