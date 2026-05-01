@@ -465,7 +465,7 @@ def data_prep_loc_trans(directory, filters = 'F814W'):
     base_dir_one = base_dir / '01.XYM'/ filters
     f=filters
     files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('_flc.xym')])    
-    files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('_flc.fits')])    
+    files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('_WJC.fits')])    
     output_file_dir = base_dir / '03.LOC_TRANS' / f
 
     output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
@@ -1018,15 +1018,14 @@ def extract_psf_1(directory):
         base_dir = Path(directory).resolve()
         subdir = base_dir / f
         in_good_psf_list = 'IN.good_psf_list.1'
-        output_file_dir = base_dir / '04.EXTRACT_PSF' / f
         output_file_img = os.path.join(output_file_dir, in_good_psf_list)
         with open(output_file_img, "w") as f:
             for i in range(1, images + 1):
                 value = 0 if i == 1 else 1
                 f.write(f"{i:2d}   {value}\n")
                 
-    prepare_data(f814_images, directory)
-    prepare_data(f606_images, directory, f = 'F606W')
+    #prepare_data(f814_images, directory)
+    #prepare_data(f606_images, directory, f = 'F606W')
     run_uvp2psf_simst(directory)
         
 def extract_psf_2(good_psf, directory):

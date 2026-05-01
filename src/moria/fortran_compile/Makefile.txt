@@ -6,16 +6,20 @@ OPT = -g
 # All .F sources
 SRCS = $(wildcard *.F)
 
-# Convert program.F → program.xOg)
+# Convert program.F → program.xOg
 EXECUTABLES = $(SRCS:.F=.xOg)
 
-# Default: build all executables
-all: $(EXECUTABLES)
+# Default: all *.xOg plus dex_no_gaia.e (same source as dex_no_gaia.xOg)
+all: $(EXECUTABLES) dex_no_gaia.e
 
 # Rule: program.F → program.xOg
 %.xOg: %.F
 	$(F77) $(OPT) $< -o $@
 
+# Also ship dex_no_gaia.F as dex_no_gaia.e (second executable name).
+dex_no_gaia.e: dex_no_gaia.F
+	$(F77) $(OPT) $< -o $@
+
 # Clean everything
 clean:
-	rm -f *.xOg
+	rm -f *.xOg dex_no_gaia.e
