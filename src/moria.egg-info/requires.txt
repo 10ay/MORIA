@@ -2,6 +2,3 @@ numpy
 astropy
 pandas
 matplotlib
-
-[mast]
-astroquery

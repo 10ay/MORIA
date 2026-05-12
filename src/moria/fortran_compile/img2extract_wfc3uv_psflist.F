@@ -47,9 +47,11 @@ c
       real pixgc_x(_PIXOUTX_,_PIXOUTY_)
       real pixgc_y(_PIXOUTX_,_PIXOUTY_)
  
-      integer NIM, NIMs
+      integer NIM, NIMs, NIMIN
+      integer NIMOUT(_NIMS_)
       character*80 FILENAME(_NIMS_)
       character*80 FILEOUT
+      character*200 MATLINE
       character*10 tag
       integer      IFILT(_NIMS_)
       real*8 XOFF(_NIMS_), YOFF(_NIMS_)
@@ -96,6 +98,14 @@ c
       real    mi_L(999)
       real    mv_L(999)
       real    mb_L(999)
+      real*8  XGCI, YGCI, XGAIAI, YGAIAI
+      real*8  MGCI, MGAIAI, DXI, DYI, X2EI, Y2EI
+      real*8  RMSI
+      integer USI, UUI
+      integer NIMMAT, MATIDX
+      character*1 MATFLAG
+      character*80 MATFILE
+      logical WANT_V, KEEP_IM, HAVE_FIT
 
       if (iargc().ne.2) then
          print*,' img2extract_wfc3_psflist takes 2 args: '
@@ -109,6 +119,11 @@ c
       call getarg(1,STRING)
       call getarg(2,tag)
       ltag = lenc(tag)
+      WANT_V = .false.
+      if (ltag.ge.1) then
+         if (tag(ltag:ltag).eq.'V'.or.tag(ltag:ltag).eq.'v')
+     .      WANT_V = .true.
+         endif
       open(10,file=STRING,status='old')
       NSTs = 0
   191 read(10,'(a80)',end=192) STRING
@@ -144,7 +159,14 @@ c
       NIMs = 0
       open(10,file='IN.img2sam_wfc3uv',status='old')
   2   continue
-      read(10,*,end=1) NIM,FILEOUT,i,DSKYu
+      read(10,*,end=1) NIMIN,FILEOUT,i,DSKYu
+      KEEP_IM = .false.
+      if (WANT_V.and.(i.eq.5.or.i.eq.6)) KEEP_IM = .true.
+      if (.not.WANT_V.and.i.eq.8) KEEP_IM = .true.
+      if (.not.KEEP_IM) goto 2
+      NIMs = NIMs + 1
+      NIM = NIMs
+      NIMOUT(NIM) = NIMIN
       DSKY(NIM) = DSKYu
       FRAT(NIM) = 1.00
       if (NIM.gt._NIMS_) then
@@ -153,17 +175,32 @@ c
          print*,'  NIMS  = ',NIMS,' IN THIS IN.img2sam FILE'
          stop
          endif
-      if (NIM.gt.NIMs) NIMs = NIM
       FILENAME(NIM) = FILEOUT
       IFILT(NIM) = i
-      write(FILEOUT,'(''MAT.'',i3.3)') NIM
-      open(11,file=FILEOUT,status='old')
+      MATIDX = 0
+      if (WANT_V.and.NIMIN.eq.3) MATIDX = 1
+      if (WANT_V.and.NIMIN.eq.4) MATIDX = 2
+      if (.not.WANT_V.and.NIMIN.eq.1) MATIDX = 3
+      if (.not.WANT_V.and.NIMIN.eq.2) MATIDX = 4
+      if (MATIDX.eq.0) then
+         print*,'NO MAT INDEX FOR IMAGE: ',NIMIN
+         stop
+         endif
+      write(MATFILE,'(''MAT.'',i3.3)') MATIDX
+      open(11,file=MATFILE,status='old')
       NMATs = 0
   3   continue
-      read(11,*,end=4) x1(NMATs+1),y1(NMATs+1),
-     .                 x2(NMATs+1),y2(NMATs+1),
-     .                 m1(NMATs+1),m2(NMATs+1)
+      read(11,'(a200)',end=4) MATLINE
+      if (MATLINE(1:1).eq.'#') goto 3
+      read(MATLINE,*,err=3,end=4)
+     .     XGAIAI, YGAIAI, XGCI, YGCI, MGAIAI, MGCI
       NMATs = NMATs + 1
+      x1(NMATs) = XGAIAI
+      y1(NMATs) = YGAIAI
+      x2(NMATs) = XGCI
+      y2(NMATs) = YGCI
+      m1(NMATs) = MGAIAI
+      m2(NMATs) = MGCI
       dm(NMATs) = m1(NMATs)-m2(NMATs)
       if (NMATs.gt._NMATMX_) then
          print*,'Increase _NMATMX_ ',(_NMATMX_)
@@ -171,9 +208,32 @@ c
          endif
       goto 3
   4   continue
-      call glob_fit6nrDP(x1,y1,x2,y2,NMATs,
-     .                   AG(NIM),BG(NIM),CG(NIM),DG(NIM),
-     .                   Xo(NIM),Yo(NIM),Wo(NIM),Zo(NIM))
+      close(11)
+      HAVE_FIT = .false.
+      if (NMATs.ge.3) then
+         call glob_fit6nrDP(x1,y1,x2,y2,NMATs,
+     .                      AG(NIM),BG(NIM),CG(NIM),DG(NIM),
+     .                      Xo(NIM),Yo(NIM),Wo(NIM),Zo(NIM))
+         HAVE_FIT = .true.
+      else
+         open(12,file='dex_no_gaia_STEP06_B.mat_gaia_info',status='old')
+   5     continue
+         read(12,'(a200)',end=6) MATLINE
+         if (MATLINE(1:1).eq.'#') goto 5
+         read(MATLINE,*,err=5,end=6)
+     .      NIMMAT, USI, UUI,
+     .      AG(NIM), BG(NIM), CG(NIM), DG(NIM),
+     .      Wo(NIM), Zo(NIM), Xo(NIM), Yo(NIM),
+     .      RMSI, DXI, DYI
+         if (NIMMAT.ne.MATIDX) goto 5
+         HAVE_FIT = .true.
+   6     continue
+         close(12)
+         if (.not.HAVE_FIT) then
+            print*,'NO STEP06 FIT FOR IMAGE: ',NIMIN
+            stop
+            endif
+         endif
       DELTA = AG(NIM)*DG(NIM)-CG(NIM)*BG(NIM)
       GA(NIM) =  DG(NIM)/DELTA
       GB(NIM) = -BG(NIM)/DELTA
@@ -185,8 +245,13 @@ c
       YOFF(NIM) = GC(NIM)*(2048-Wo(NIM))
      .          + GD(NIM)*(2048-Zo(NIM))
      .          + Yo(NIM)-2048
-      call barsig(dm,NMATs,bar,sig,NMATu,clist)
-      write(*,113) NIM,NMATs,AG(NIM),BG(NIM),CG(NIM),DG(NIM),
+      if (NMATs.ge.1) then
+         call barsig(dm,NMATs,bar,sig,NMATu,clist)
+      else
+         bar = 0.d0
+         sig = 0.d0
+         endif
+      write(*,113) NIMOUT(NIM),NMATs,AG(NIM),BG(NIM),CG(NIM),DG(NIM),
      .             XOFF(NIM),YOFF(NIM),IFILT(NIM),bar,sig,
      .             FILENAME(NIM)
  113  format(i3.3,4x,i5,4x,4f13.7,4x,2f14.2,4x,i3,1x,2f10.3,5x,60a)
@@ -197,6 +262,11 @@ c
       goto 2
   1   continue
       close(10)
+      if (NIMs.le.0) then
+         print*,'NO IMAGES SELECTED FROM IN.img2sam_wfc3uv'
+         print*,'FOR TAG: ',tag(1:ltag)
+         stop
+         endif
  
  
       print*,' '
@@ -259,7 +329,7 @@ c
          y0 = y_l(NST)
          rr = 15.00
          do NIM = 1, NIMs
-            print*,'----> IMAGE NIM: ',NIM
+            print*,'----> IMAGE NIM: ',NIMOUT(NIM)
             do i = 0001, 4096
             do j = 0001, 4096
                xr = i
@@ -276,7 +346,7 @@ c
                      pixe = 55000 + (pixe-55000)*5
                      endif
                   write(81,181) xref,yref,pixe,
-     .                          NIM,i,j,xc,yc,
+     .                          NIMOUT(NIM),i,j,xc,yc,
      .                          xref-x0, yref-y0,rref,
      .                          NST,u_L(NST)
   181             format(1x,f9.3,1x,f9.3,1x,f10.1,

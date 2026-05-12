@@ -52,6 +52,100 @@ def copy_entire_files(source, destination, filename):
     if os.path.isfile(path):
         shutil.copy2(source / filename, os.path.join(destination, filename))
 
+
+def xympquvwrd_to_physical_xym(xym_dir):
+    """
+    Read each ``*xympquvwrd`` in ``xym_dir`` and write a sibling ``*.xym``.
+
+    hst1pass ``OUT=xympquvwrd`` rows are: ``x_raw y_raw m p q u v w r d ...``.
+    DS9 **Physical** circles in ``REG=uv`` use ``u,v`` (cols 6–7).  The output
+    ``.xym`` repeats the same numeric layout but replaces the first two columns
+    with ``u,v`` so list **x,y** match DS9 Physical while ``m p q u v w r d`` stay
+    aligned with the source (``u,v`` appear in both positions 1–2 and 6–7).
+
+    Example: ``visit_flc.F814W_xympquvwrd`` → ``visit_flc.F814W.xym``.
+
+    Parameters
+    ----------
+    xym_dir : str or pathlib.Path
+        Directory containing the hst1pass lists (often ``01.XYM``).
+
+    Returns
+    -------
+    list[pathlib.Path]
+        Paths of written ``.xym`` files.
+    """
+    d = Path(xym_dir).resolve()
+    if not d.is_dir():
+        raise FileNotFoundError(str(d))
+
+    annot = (
+        "# MORIA: cols 01-02 = u,v (DS9 Physical, hst1pass REG=uv); "
+        "raw xy were former 01-02 of this xympquvwrd.\n"
+    )
+    written: list[Path] = []
+
+    for src in sorted(d.glob("*xympquvwrd")):
+        if not src.is_file():
+            continue
+        name = src.name
+        if not name.endswith("xympquvwrd"):
+            continue
+        stem = name[: -len("_xympquvwrd")]
+        out_path = src.with_name(stem + ".xym")
+
+        out_lines: list[str] = []
+        inserted_annot = False
+        with src.open(encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if (not inserted_annot) and "#  FILEOUT:" in line:
+                    out_lines.append(line)
+                    out_lines.append(annot)
+                    inserted_annot = True
+                    continue
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    out_lines.append(line)
+                    continue
+                parts = s.split()
+                if len(parts) < 10:
+                    out_lines.append(line)
+                    continue
+                _xr, _yr = parts[0], parts[1]
+                m, p, q = parts[2], parts[3], parts[4]
+                u, v, w, r, d = parts[5], parts[6], parts[7], parts[8], parts[9]
+                tail = parts[10:]
+                try:
+                    uf, vf = float(u), float(v)
+                    mf = float(m)
+                    pf = float(p)
+                    qf = float(q)
+                    wf = float(w)
+                    rf = float(r)
+                    ddf = float(d)
+                except ValueError:
+                    out_lines.append(line)
+                    continue
+                # Match ~hst1pass column spacing (see xympquvwrd examples).
+                body = (
+                    f"{uf:11.4f}{vf:11.4f}"
+                    f"{mf:8.3f}{pf:9.2f}{qf:10.3f}"
+                    f"{uf:11.4f}{vf:11.4f}"
+                    f"{wf:8.3f}{rf:14.8f}{ddf:14.8f}"
+                )
+                if tail:
+                    body += " " + " ".join(tail)
+                out_lines.append(body + "\n")
+
+        if not inserted_annot:
+            out_lines.insert(0, annot)
+
+        out_path.write_text("".join(out_lines), encoding="utf-8")
+        written.append(out_path)
+
+    return written
+
+
 def data_prep_early(destination):
     fortran_src = get_fortran_dir()
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xOg"])
@@ -59,9 +153,9 @@ def data_prep_early(destination):
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="dex_no_gaia.e")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="hst1pass.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="hst1pass.F")
-    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F814W", filename="img2extract_wfc3uv_psflist.xOg")
-    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F606W", filename="xym2mat.xOg")
-    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS" / "F606W", filename="img2extract_wfc3uv_psflist.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS", filename="img2extract_wfc3uv_psflist.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS", filename="xym2mat_new.e")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS", filename="img2extract_wfc3uv_psflist.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F814W", filename="uvp2psf_simst.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F606W", filename="uvp2psf_simstV.xOg")
 
@@ -275,8 +369,8 @@ def data_prep(directory):
                 
         return
     
-    data_prep_F814W(directory)
-    data_prep_F606W(directory)
+    #data_prep_F814W(directory)
+    #data_prep_F606W(directory)
     
 def _count_wj2_xym(field_dir: Path) -> int:
     """Number of WFC3 *WJ2.xym lists in 01.XYM/Filter (one per exposure/stack)."""
@@ -353,7 +447,19 @@ def matchup_files(directory):
                             )
         names606 = [p.name for p in f606]
         names814 = [p.name for p in f814]
-        line = "./dex_no_gaia.e " + " ".join(names606 + names814) + "\n"
+        field_root = Path(directory).resolve()
+        ref_candidates = [
+            (base_dir / "NEARBY_REF_STARS.XYIVB_targ", "NEARBY_REF_STARS.XYIVB_targ"),
+            (base_dir / "NEARBY_SIM_STARS.XYIVB_targ", "NEARBY_SIM_STARS.XYIVB_targ"),
+            (field_root / "02.CMD" / "NEARBY_REF_STARS.XYIVB_targ", "../02.CMD/NEARBY_REF_STARS.XYIVB_targ"),
+            (field_root / "02.CMD" / "NEARBY_SIM_STARS.XYIVB_targ", "../02.CMD/NEARBY_SIM_STARS.XYIVB_targ"),
+        ]
+        ref_prefix = ""
+        for path, argv_token in ref_candidates:
+            if path.is_file():
+                ref_prefix = argv_token + " "
+                break
+        line = "./dex_no_gaia.e " + ref_prefix + " ".join(names606 + names814) + "\n"
         script_path = base_dir / script
         script_path.write_text(line, encoding="utf-8")
 
@@ -395,7 +501,70 @@ def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
                 )
         finally:
                 sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__        
+                sys.stderr = sys.__stderr__
+
+
+def write_in_xym2mat_loc_trans(
+    output_path: Path,
+    xym_dir: Path,
+) -> None:
+    """
+    Write ``IN.xym2mat`` for LOC_TRANS: reference line plus four exposure lines
+    using the two ``*.F814W_xympquvwrd`` catalogs first, followed by the two
+    ``*.F606W_xympquvwrd`` catalogs in ``01.XYM``.
+    """
+    groups = [
+        ("F814W", "c8 f8", '"m-13.75,-8.5"'),
+        ("F606W", "c8 f6", '"m-14.75,-5.5"'),
+    ]
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as fh:
+        fh.write("00 NEARBY_REF_STARS.XYIVB_targ c0\n")
+        idx = 1
+        for filter_name, chip_f, mag_clip in groups:
+            suffix = f".{filter_name}_xympquvwrd"
+            names = sorted(
+                p.name
+                for p in xym_dir.iterdir()
+                if p.is_file() and p.name.endswith(suffix)
+            )
+            if len(names) != 2:
+                raise FileNotFoundError(
+                    f"write_in_xym2mat_loc_trans: need exactly two *{suffix} files "
+                    f"under {xym_dir}, found {len(names)}"
+                )
+            for filename in names:
+                fh.write(f"{idx:02d} {filename} {chip_f} {mag_clip} \n")
+                idx += 1
+
+
+def write_in_img2sam_wfc3uv_loc_trans(
+    output_path: Path,
+    data_dir: Path,
+) -> None:
+    """
+    Write ``IN.img2sam_wfc3uv`` for LOC_TRANS using the two ``F814W`` WJC files
+    first, followed by the two ``F606W`` WJC files from ``00.DATA``.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as fh:
+        idx = 1
+        for filter_name, chip in (("F814W", 8), ("F606W", 6)):
+            fits_dir = data_dir / filter_name
+            names = sorted(
+                p.name
+                for p in fits_dir.iterdir()
+                if p.is_file() and p.name.endswith("_WJC.fits")
+            )
+            if len(names) != 2:
+                raise FileNotFoundError(
+                    f"write_in_img2sam_wfc3uv_loc_trans: need exactly two *_WJC.fits "
+                    f"under {fits_dir}, found {len(names)}"
+                )
+            for filename in names:
+                fh.write(f'{idx:02d} "{filename}" {chip} 0\n')
+                idx += 1
+
 
 def data_prep_loc_trans(directory, filters = 'F814W'):
     """
@@ -412,43 +581,25 @@ def data_prep_loc_trans(directory, filters = 'F814W'):
     several IN.* files.
     """
 
-    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "03.LOC_TRANS" / filters)
-    copy_files(source=Path(directory).resolve() / "01.XYM" / filters, extensions=[".xym"], destination=Path(directory).resolve() / "03.LOC_TRANS" / filters)
-    copy_files(source=Path(directory).resolve() / "01.XYM" / filters , extensions=[".fits"], destination=Path(directory).resolve() / "03.LOC_TRANS" / filters)
+    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "03.LOC_TRANS")
+    copy_files(source=Path(directory).resolve() / "01.XYM", extensions=[".F606W_xympquvwrd"], destination=Path(directory).resolve() / "03.LOC_TRANS")
+    copy_files(source=Path(directory).resolve() / "01.XYM", extensions=[".F814W_xympquvwrd"], destination=Path(directory).resolve() / "03.LOC_TRANS")
+    copy_files(source=Path(directory).resolve() / "00.DATA" / "F606W", extensions=[".fits"], destination=Path(directory).resolve() / "03.LOC_TRANS")
+    copy_files(source=Path(directory).resolve() / "00.DATA" / "F814W", extensions=[".fits"], destination=Path(directory).resolve() / "03.LOC_TRANS")
 
     base_dir = Path(directory).resolve()
 
-    subdir = base_dir / filters
     in_img2sam_wfc3uv = 'IN.img2sam_wfc3uv'
     in_xym2mat = 'IN.xym2mat'
 
-    base_dir_one = base_dir / '01.XYM'/ filters
-    f=filters
-    files = sorted([f for f in os.listdir(base_dir_one) if f.endswith('_flc.xym')])    
-    files_two = sorted([f for f in os.listdir(base_dir_one) if f.endswith('_WJC.fits')])    
-    output_file_dir = base_dir / '03.LOC_TRANS' / f
+    base_dir_one = base_dir / '01.XYM'
+    output_file_dir = base_dir / '03.LOC_TRANS' 
 
     output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
     output_file_xym2mat = os.path.join(output_file_dir, in_xym2mat)
-    if filters == 'F814W':
-        with open(output_file_xym2mat, "w") as f:
-            f.write("00 NEARBY_REF_STARS.XYIVB_targ c0\n")
-            for i, filename in enumerate(files, start=1):
-                f.write(f"{i:02d} {filename} c8 f8 \"m-13.75,-8.5\" \n")
-    
-        with open(output_file_img2sam, "w") as t:
-            for i, filename in enumerate(files_two, start=1):
-                t.write(f"{i:02d} \"{filename}\" 8 0\n")
-    else:
-        with open(output_file_xym2mat, "w") as f:
-            f.write("00 NEARBY_REF_STARS.XYIVB_targ c0\n")
-            for i, filename in enumerate(files, start=1):
-                f.write(f"{i:02d} {filename} c8 f8 \"m-14.75,-5.5\" \n")
-    
-        with open(output_file_img2sam, "w") as t:
-            for i, filename in enumerate(files_two, start=1):
-                t.write(f"{i:02d} \"{filename}\" 6 0\n")
-            
+    #write_in_xym2mat_loc_trans(Path(output_file_xym2mat), base_dir_one)
+    write_in_img2sam_wfc3uv_loc_trans(Path(output_file_img2sam), base_dir / "00.DATA")
+
     return
 
 def loc_trans(directory):
@@ -473,18 +624,16 @@ def loc_trans(directory):
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "03.LOC_TRANS"
-                filters = ['F814W', 'F606W']
-                for f in filters:
-                    subdir = base_dir / f
-                    script_path = subdir / script if f == "F814W" else base_dir / "F606W" / script
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
+                subdir = base_dir 
+                script_path = subdir / script
+                subprocess.run(
+                    ["bash", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
@@ -495,19 +644,17 @@ def loc_trans(directory):
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "03.LOC_TRANS"
-                filters = ['F814W', 'F606W']
-                for f in filters:
-                    subdir = base_dir / f
-                    script = 'run_img2extract_wfc3uv_psflist_simst.src' if f == "F814W" else 'run_img2extract_wfc3uv_psflist_simstV.src'
-                    script_path = base_dir / f / script
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
+                subdir = base_dir 
+                script = 'run_img2extract_wfc3uv_psflist_simst.src' 
+                script_path = base_dir / script
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
+                )
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
@@ -519,25 +666,22 @@ def loc_trans(directory):
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "03.LOC_TRANS"
-                filters = ['F814W', 'F606W']
-                for f in filters:
-                    subdir = base_dir / f
-                    script = 'run_img2extract_wfc3uv_psflist_Cal.src' if f == "F814W" else 'run_img2extract_wfc3uv_psflist_CalV.src'
-                    script_path = base_dir / f / script
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
+                subdir = base_dir 
+                script = 'run_img2extract_wfc3uv_psflist_Cal.src' 
+                script_path = base_dir / script
+                subprocess.run(
+                    ["csh", str(script_path)],
+                    cwd=subdir,
+                    stdout=logf,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False
                     )
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
                 
     data_prep_loc_trans(directory)
-    data_prep_loc_trans(directory, filters = 'F606W')
     run_xym2mat(directory)
     run_img2extract_wfc3uv_psflist(directory)
     run_img2extract_wfc3uv_psflist_Cal(directory)
@@ -951,7 +1095,7 @@ def extract_psf_1(directory):
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "04.EXTRACT_PSF"
-                filters = ['F814W', 'F606W']
+                filters = ['F814W']
                 for f in filters:
                     subdir = base_dir / f
                     script = 'run_uvp2psf_simst_1.src' if f == "F814W" else 'run_uvp2psf_simstV_1.src'
@@ -967,8 +1111,8 @@ def extract_psf_1(directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", extensions=[".gz"])
-    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W")
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W")
     f814_images   = int(input("Enter the number of images for the F814W filter: "))
@@ -978,14 +1122,15 @@ def extract_psf_1(directory):
         base_dir = Path(directory).resolve()
         subdir = base_dir / f
         in_good_psf_list = 'IN.good_psf_list.1'
+        output_file_dir = base_dir / '04.EXTRACT_PSF' / f
         output_file_img = os.path.join(output_file_dir, in_good_psf_list)
         with open(output_file_img, "w") as f:
             for i in range(1, images + 1):
                 value = 0 if i == 1 else 1
                 f.write(f"{i:2d}   {value}\n")
                 
-    #prepare_data(f814_images, directory)
-    #prepare_data(f606_images, directory, f = 'F606W')
+    prepare_data(f814_images, directory)
+    prepare_data(f606_images, directory, f = 'F606W')
     run_uvp2psf_simst(directory)
         
 def extract_psf_2(good_psf, directory):
@@ -1329,8 +1474,8 @@ def tri_fit_F814W_opt(directory):
     copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename="mcmc_expand_average.xOg")
 
     copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
-    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", extensions=[".gz"])
-    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit",  extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit",  extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit")
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit")
     copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", extensions=[".fits"])
@@ -1427,10 +1572,10 @@ def hst_fit_final_F814W(directory):
         for name in _uvp2tri_fsky_outputs:
             (_fit_2star / name).unlink(missing_ok=True)
 
-    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "1star-fit", extensions=[".gz"])
-    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "2star-fit", extensions=[".gz"])
-    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "1star-fit",  extensions=[".gz"])
-    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "2star-fit",  extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "1star-fit", extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "2star-fit", extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "1star-fit",  extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "2star-fit",  extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F814W" / "1star-fit")
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F814W" / "2star-fit")
 
@@ -1732,7 +1877,7 @@ def calibration_new_matchup(directory):
     copy_entire_files(source=Path(directory).resolve() / "02.CMD", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "MATCHUP.F606W.XYM")
     copy_entire_files(source=Path(directory).resolve() / "02.CMD", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "MATCHUP.F814W.XYM.02")
 
-    copy_entire_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "outputq.fits")
+    copy_entire_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "outputq.fits")
 
 
     def psf_star_mags_mcmc(directory, script='run_psf_star_Imags_mcmc.src'):

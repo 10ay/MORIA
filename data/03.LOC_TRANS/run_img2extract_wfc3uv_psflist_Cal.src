@@ -1,0 +1,4 @@
+./img2extract_wfc3uv_psflist.xOg NOTFAR_CAL_STARS.XYIVB_targ Cal
+gzip -f img2extract_wfc3uv_psflist_Cal.uvp
+./img2extract_wfc3uv_psflist.xOg NOTFAR_CAL_STARS.XYIVB_targ CalV
+gzip -f img2extract_wfc3uv_psflist_CalV.uvp

@@ -3,7 +3,7 @@ Name: moria
 Version: 0.1.0
 Summary: MORIA: HST fly star reduction pipeline
 Author-email: Your Name <you@example.com>
-License: MIT
+License-Expression: MIT
 Project-URL: Homepage, https://example.com/moria
 Requires-Python: >=3.9
 Description-Content-Type: text/markdown
@@ -11,10 +11,10 @@ Requires-Dist: numpy
 Requires-Dist: astropy
 Requires-Dist: pandas
 Requires-Dist: matplotlib
-Provides-Extra: mast
-Requires-Dist: astroquery; extra == "mast"
 
 # MORIA: Microlensing Object high-Resolution Imaging Analysis (MORIA)
+
+To be able to run
 
 ## How to Install
 
