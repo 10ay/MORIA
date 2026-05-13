@@ -1,7 +1,5 @@
 # MORIA: Microlensing Object high-Resolution Imaging Analysis (MORIA)
 
-To be able to run
-
 ## How to Install
 
 The easiest way to install this code is to first clone it. You can do this by running the command below:
@@ -43,5 +41,12 @@ To be able to run the notebooks and the pipeline, we recommend installing a fort
     numpy 
 
 The entire pipeline is also summarized in detail [here](https://docs.google.com/document/d/1t8rLScKMqQ0oCqxvHKvAT6LXi1fT8aqSIPO8eTue8SQ/edit?tab=t.0)
+
+## Acknowledgment 
+
+This following scientific publications should be acknowledged by a citation to the works relevant to your study:
+
+[Bhadra, T. D. et al. “You Shall Not Pass (Without Modeling): High-Resolution Analysis of KMT-2019-BLG-0253 using MORIA.”](https://arxiv.org/abs/2605.08340)
+
 
 ![Logo](https://github.com/10ay/MORIA/blob/main/new_logo.png)
