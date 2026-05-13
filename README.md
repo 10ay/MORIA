@@ -46,7 +46,7 @@ The entire pipeline is also summarized in detail [here](https://docs.google.com/
 
 This following scientific publications should be acknowledged by a citation to the works relevant to your study:
 
-[Bhadra, T. D. et al. “You Shall Not Pass (Without Modeling): High-Resolution Analysis of KMT-2019-BLG-0253 using MORIA.” (Submitted to the Astronomical Journal](https://arxiv.org/abs/2605.08340)
+[Bhadra, T. D. et al. “You Shall Not Pass (Without Modeling): High-Resolution Analysis of KMT-2019-BLG-0253 using MORIA.”](https://arxiv.org/abs/2605.08340)
 
 
 ![Logo](https://github.com/10ay/MORIA/blob/main/new_logo.png)
