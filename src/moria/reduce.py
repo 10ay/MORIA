@@ -597,7 +597,7 @@ def data_prep_loc_trans(directory, filters = 'F814W'):
 
     output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
     output_file_xym2mat = os.path.join(output_file_dir, in_xym2mat)
-    #write_in_xym2mat_loc_trans(Path(output_file_xym2mat), base_dir_one)
+    write_in_xym2mat_loc_trans(Path(output_file_xym2mat), base_dir_one)
     write_in_img2sam_wfc3uv_loc_trans(Path(output_file_img2sam), base_dir / "00.DATA")
 
     return
