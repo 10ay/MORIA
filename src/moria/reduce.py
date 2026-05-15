@@ -504,38 +504,34 @@ def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
                 sys.stderr = sys.__stderr__
 
 
-def write_in_xym2mat_loc_trans(
-    output_path: Path,
-    xym_dir: Path,
-) -> None:
+def write_run_xym2mat_src_loc_trans(output_path: Path, xym_dir: Path) -> None:
     """
-    Write ``IN.xym2mat`` for LOC_TRANS: reference line plus four exposure lines
-    using the two ``*.F814W_xympquvwrd`` catalogs first, followed by the two
-    ``*.F606W_xympquvwrd`` catalogs in ``01.XYM``.
+    Write ``run_xym2mat.src`` for LOC_TRANS: a single line invoking
+    ``./xym2mat_new.e`` with two ``*F606W*xympquvwrd`` files then two
+    ``*F814W*xympquvwrd`` files (sorted within each filter), matching
+    ``xym2mat_new.F`` command-line parsing.
     """
-    groups = [
-        ("F814W", "c8 f8", '"m-13.75,-8.5"'),
-        ("F606W", "c8 f6", '"m-14.75,-5.5"'),
-    ]
+    f606 = sorted(
+        p.name
+        for p in xym_dir.iterdir()
+        if p.is_file() and p.name.endswith(".F606W_xympquvwrd")
+    )
+    f814 = sorted(
+        p.name
+        for p in xym_dir.iterdir()
+        if p.is_file() and p.name.endswith(".F814W_xympquvwrd")
+    )
+    if len(f606) != 2 or len(f814) != 2:
+        raise FileNotFoundError(
+            "write_run_xym2mat_src_loc_trans: need exactly two "
+            "*.F606W_xympquvwrd and two *.F814W_xympquvwrd under "
+            f"{xym_dir}, found F606W={len(f606)} F814W={len(f814)}"
+        )
+    files = f606 + f814
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    line = "./xym2mat_new.e " + " ".join(files) + "\n"
     with open(output_path, "w", encoding="utf-8") as fh:
-        fh.write("00 NEARBY_REF_STARS.XYIVB_targ c0\n")
-        idx = 1
-        for filter_name, chip_f, mag_clip in groups:
-            suffix = f".{filter_name}_xympquvwrd"
-            names = sorted(
-                p.name
-                for p in xym_dir.iterdir()
-                if p.is_file() and p.name.endswith(suffix)
-            )
-            if len(names) != 2:
-                raise FileNotFoundError(
-                    f"write_in_xym2mat_loc_trans: need exactly two *{suffix} files "
-                    f"under {xym_dir}, found {len(names)}"
-                )
-            for filename in names:
-                fh.write(f"{idx:02d} {filename} {chip_f} {mag_clip} \n")
-                idx += 1
+        fh.write(line)
 
 
 def write_in_img2sam_wfc3uv_loc_trans(
@@ -568,7 +564,10 @@ def write_in_img2sam_wfc3uv_loc_trans(
 
 def data_prep_loc_trans(directory, filters = 'F814W'):
     """
-    Preparae IN.* files in respective files using _WJ2.fits files in 00.DATA
+    Prepare LOC_TRANS inputs: copy star lists and FITS into ``03.LOC_TRANS``,
+    write ``IN.img2sam_wfc3uv``, and write ``run_xym2mat.src`` (``xym2mat_new.e``
+    with four catalog filenames: F606W×2 then F814W×2).
+
     Parameters
     ----------
     directory - The root directory to operate on. There is a specific directory
@@ -578,7 +577,7 @@ def data_prep_loc_trans(directory, filters = 'F814W'):
 
     Returns
     -------
-    several IN.* files.
+    several IN.* files and ``run_xym2mat.src``.
     """
 
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "03.LOC_TRANS")
@@ -590,14 +589,13 @@ def data_prep_loc_trans(directory, filters = 'F814W'):
     base_dir = Path(directory).resolve()
 
     in_img2sam_wfc3uv = 'IN.img2sam_wfc3uv'
-    in_xym2mat = 'IN.xym2mat'
 
     base_dir_one = base_dir / '01.XYM'
     output_file_dir = base_dir / '03.LOC_TRANS' 
 
     output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
-    output_file_xym2mat = os.path.join(output_file_dir, in_xym2mat)
-    write_in_xym2mat_loc_trans(Path(output_file_xym2mat), base_dir_one)
+    output_run_xym2mat = os.path.join(output_file_dir, "run_xym2mat.src")
+    write_run_xym2mat_src_loc_trans(Path(output_run_xym2mat), base_dir_one)
     write_in_img2sam_wfc3uv_loc_trans(Path(output_file_img2sam), base_dir / "00.DATA")
 
     return
