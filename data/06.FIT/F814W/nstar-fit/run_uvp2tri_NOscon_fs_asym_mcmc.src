@@ -1,0 +1,5 @@
+# Interactive N-star fit: prompts for N, each star x y, fluxes, jumps, etc.
+# Writes IN.uvp2pri_NOscon_cs_asym_mcmc (or path you enter) then runs the MCMC.
+gunzip -f img2extract_wfc3uv_psflist_simst.uvp.gz
+python3 uvp2tri_scon_fs_asym_mcmc.py -i
+gzip -f img2extract_wfc3uv_psflist_simst.uvp

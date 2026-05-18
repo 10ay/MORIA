@@ -1470,7 +1470,6 @@ def tri_fit_F814W_opt(directory):
 
     fortran_src = get_fortran_dir()
     copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename="mcmc_expand_average.xOg")
-
     copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit",  extensions=[".gz"])
@@ -1486,7 +1485,28 @@ def tri_fit_F814W_opt(directory):
     run_mcmc_expand_average_814W(directory)
     #run_mcmc_expand_average_606W(directory)
 
+def nstar_fit_prepare(directory):
+    """
+    Fit the pixels of the target star with the PSF to determine the best-fit nstar model in the F814W filter. 
+    Parameters
+    ----------
+    directory : str or Path
+        Root directory containing 00.DATA/ and 01.XYM/ folders.
 
+    Returns
+    -------
+    Local PSF for each filter
+    """
+    fortran_src = get_fortran_dir()
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "nstar-fit", filename="mcmc_expand_average.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "nstar-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "nstar-fit", extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "nstar-fit",  extensions=[".gz"])
+    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F814W" / "nstar-fit")
+    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F606W" / "nstar-fit")
+    copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "nstar-fit", extensions=[".fits"])
+    copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "nstar-fit", extensions=[".fits"])
+    #run_mcmc_expand_average_606W(directory)
 
 def hst_fit_final_F814W(directory):
     """
