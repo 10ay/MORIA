@@ -146,7 +146,114 @@ def xympquvwrd_to_physical_xym(xym_dir):
     return written
 
 
+_WFC3UV_PSF_STDPSF_BASE = (
+    "https://www.stsci.edu/~jayander/WFC3/WFC3UV_PSFs/STDPSF/"
+)
+_WFC3UV_PSF_BASE = "https://www.stsci.edu/~jayander/WFC3/WFC3UV_PSFs/"
+_WFC3UV_STDGDC_BASE = (
+    "https://www.stsci.edu/~jayander/HST1PASS/LIB/GDCs/STDGDCs/WFC3UV/"
+)
+
+# (base URL, filename, per-file timeout seconds) — Jay Anderson WFC3/UV reference FITS
+_WFC3UV_REFERENCE_DOWNLOADS = (
+    (_WFC3UV_PSF_STDPSF_BASE, "PSFSTD_WFC3UV_F814W.fits", 120.0),
+    (_WFC3UV_PSF_STDPSF_BASE, "PSFSTD_WFC3UV_F606W.fits", 120.0),
+    (_WFC3UV_PSF_BASE, "PSFEFF_WFC3UV_F814W_C0.fits", 120.0),
+    (_WFC3UV_PSF_BASE, "PSFEFF_WFC3UV_F606W_C0.fits", 120.0),
+    (_WFC3UV_STDGDC_BASE, "STDGDC_WFC3UV_F814W.fits", 7200.0),
+    (_WFC3UV_STDGDC_BASE, "STDGDC_WFC3UV_F606W.fits", 7200.0),
+)
+
+
+def _download_url_to_path(
+    url: str,
+    out_path: Path,
+    timeout_s: float = 120.0,
+    *,
+    verbose: bool = False,
+) -> None:
+    """Download ``url`` to ``out_path`` (write via a ``.part`` temp file)."""
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = out_path.with_suffix(out_path.suffix + ".part")
+    if verbose:
+        print(f"Downloading {out_path.name} …", flush=True)
+    try:
+        with urllib.request.urlopen(url, timeout=timeout_s) as resp:
+            with open(tmp_path, "wb") as f:
+                shutil.copyfileobj(resp, f)
+        tmp_path.replace(out_path)
+        if verbose:
+            mb = out_path.stat().st_size / (1024 * 1024)
+            print(f"  → {out_path} ({mb:.1f} MiB)", flush=True)
+    except Exception:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+        raise
+
+
+def download_wfc3uv_psf_libraries(
+    directory: str | Path,
+    dest_subdirs: tuple[str, ...] = ("01.XYM", "03.LOC_TRANS"),
+    overwrite: bool = False,
+    timeout_s: float | None = None,
+    verbose: bool = True,
+) -> dict[str, list[str]]:
+    """
+    Fetch WFC3/UV PSF and GDC reference FITS from Jay Anderson's STScI pages.
+
+    Writes each file into every ``dest_subdirs`` folder under ``directory``
+    (default ``01.XYM`` and ``03.LOC_TRANS``).
+
+    Sources:
+
+    - `PSF STDPSF`_ — ``PSFSTD_WFC3UV_F814W.fits``, ``PSFSTD_WFC3UV_F606W.fits``
+    - `WFC3UV PSFs`_ — ``PSFEFF_WFC3UV_F814W_C0.fits``, ``PSFEFF_WFC3UV_F606W_C0.fits``
+    - `STDGDC WFC3UV`_ — ``STDGDC_WFC3UV_F814W.fits``, ``STDGDC_WFC3UV_F606W.fits``
+      (~300 MiB each; allow several minutes per file)
+
+    .. _PSF STDPSF: https://www.stsci.edu/~jayander/WFC3/WFC3UV_PSFs/STDPSF/
+    .. _WFC3UV PSFs: https://www.stsci.edu/~jayander/WFC3/WFC3UV_PSFs/
+    .. _STDGDC WFC3UV: https://www.stsci.edu/~jayander/HST1PASS/LIB/GDCs/STDGDCs/WFC3UV/
+    """
+    root = Path(directory).resolve()
+    results: dict[str, list[str]] = {"downloaded": [], "skipped": []}
+
+    if verbose:
+        print(f"MORIA reference FITS → {root}", flush=True)
+
+    for sub in dest_subdirs:
+        dest_dir = root / sub
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        if verbose:
+            print(f"  [{sub}]", flush=True)
+        for base_url, name, file_timeout in _WFC3UV_REFERENCE_DOWNLOADS:
+            url = base_url.rstrip("/") + "/" + name
+            out_path = dest_dir / name
+            if out_path.exists() and not overwrite:
+                results["skipped"].append(str(out_path))
+                if verbose:
+                    print(f"  skip (exists): {out_path.name}", flush=True)
+                continue
+            tmo = file_timeout if timeout_s is None else timeout_s
+            _download_url_to_path(url, out_path, timeout_s=tmo, verbose=verbose)
+            results["downloaded"].append(str(out_path))
+
+    if verbose:
+        print(
+            f"Done: {len(results['downloaded'])} downloaded, "
+            f"{len(results['skipped'])} skipped.",
+            flush=True,
+        )
+
+    return results
+
+
 def data_prep_early(destination):
+    download_wfc3uv_psf_libraries(destination)
+
     fortran_src = get_fortran_dir()
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xOg"])
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=[".xOg"])
