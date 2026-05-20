@@ -91,6 +91,7 @@ c#include "/home/jayander/FORTRAN/MAC_OSX/FITS/writfits_r4.f"
       real   sz_mn(_MDIM_,_NDIM_)     
       integer u_mn(_MDIM_,_NDIM_)     
       integer NIMu
+      integer NIM_ORIG(_MDIM_), NIMNEW
       real    e, find_error 
       real*8  emin, xmin, ymin
       integer i, j
@@ -173,6 +174,25 @@ c
 
       goto 1
     2 continue
+
+      NIMu = 0
+      do NIM = 1, _MDIM_
+         NIM_ORIG(NIM) = 0
+         enddo
+      do L = 1, Ls
+         NIMNEW = 0
+         do NIM = 1, NIMu
+            if (niml(L).eq.NIM_ORIG(NIM)) NIMNEW = NIM
+            enddo
+         if (NIMNEW.eq.0) then
+            NIMu = NIMu + 1
+            if (NIMu.gt._MDIM_) stop 'NIMu.gt._MDIM_'
+            NIM_ORIG(NIMu) = niml(L)
+            NIMNEW = NIMu
+            endif
+         niml(L) = NIMNEW
+         enddo
+      NIMs = NIMu
 
 c     Read list of good PSFs
 c     ----------------------
@@ -266,6 +286,12 @@ c     ----------------------
       do i = 0001, 0501
       do j = 0001, 1001
          show_psf(i,j) = 0.
+         enddo
+         enddo
+
+      do ipsf = 001, 101
+      do jpsf = 001, 101
+         psfn(ipsf,jpsf) = 0.00
          enddo
          enddo
 

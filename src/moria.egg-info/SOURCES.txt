@@ -28,6 +28,7 @@ src/moria/fortran_compile/img2sam_wfc3uv_379.F
 src/moria/fortran_compile/img2xym_wfc3uv.F
 src/moria/fortran_compile/matched_HST_Keck_stars.F
 src/moria/fortran_compile/mcmc_expand_average.F
+src/moria/fortran_compile/mcmc_expand_average_nstar.F
 src/moria/fortran_compile/psf_star_mags_mcmc.F
 src/moria/fortran_compile/psf_star_mags_mcmc.f
 src/moria/fortran_compile/uvp2psf_simst.F

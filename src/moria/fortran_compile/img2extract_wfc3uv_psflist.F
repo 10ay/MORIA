@@ -106,6 +106,8 @@ c
       character*1 MATFLAG
       character*80 MATFILE
       logical WANT_V, KEEP_IM, HAVE_FIT
+      character*200 FILE_STDGDC(_NIMS_)
+      logical USE_ACS_GDC, ACS814, WFC814
 
       if (iargc().ne.2) then
          print*,' img2extract_wfc3_psflist takes 2 args: '
@@ -123,6 +125,18 @@ c
       if (ltag.ge.1) then
          if (tag(ltag:ltag).eq.'V'.or.tag(ltag:ltag).eq.'v')
      .      WANT_V = .true.
+         endif
+      USE_ACS_GDC = .false.
+      inquire(file='STDGDC_OFFICIAL_JFRAME_ACSWFC_F814W.fits',
+     .        exist=ACS814)
+      inquire(file='STDGDC_WFC3UV_F814W.fits',exist=WFC814)
+      if (ACS814.and..not.WFC814) USE_ACS_GDC = .true.
+      if (ACS814.and.WFC814) then
+         print*,'Both ACS and WFC3 GDC FITS found; using WFC3 GDC.'
+         print*,'Keep only the GDC files for your camera in this dir.'
+         endif
+      if (USE_ACS_GDC) then
+         print*,'img2extract: ACS/WFC STDGDC distortion correction'
          endif
       open(10,file=STRING,status='old')
       NSTs = 0
@@ -177,6 +191,15 @@ c
          endif
       FILENAME(NIM) = FILEOUT
       IFILT(NIM) = i
+      FILE_STDGDC(NIM) = 'NONE'
+      if (USE_ACS_GDC) then
+         if (i.eq.5.or.i.eq.6)
+     .       FILE_STDGDC(NIM) =
+     .       'STDGDC_OFFICIAL_JFRAME_ACSWFC_F606W.fits'
+         if (i.eq.8)
+     .       FILE_STDGDC(NIM) =
+     .       'STDGDC_OFFICIAL_JFRAME_ACSWFC_F814W.fits'
+         endif
       MATIDX = 0
       if (WANT_V.and.NIMIN.eq.3) MATIDX = 1
       if (WANT_V.and.NIMIN.eq.4) MATIDX = 2
@@ -334,7 +357,11 @@ c
             do j = 0001, 4096
                xr = i
                yr = j
-               call wfc3uv_gcj_meta(xr,yr,IFILT(NIM),xc,yc)
+               if (USE_ACS_GDC) then
+                  call xryr2xcyc_stdgdc(xr,yr,xc,yc,FILE_STDGDC(NIM))
+               else
+                  call wfc3uv_gcj_meta(xr,yr,IFILT(NIM),xc,yc)
+               endif
                xref = Xo(NIM) + GA(NIM)*(xc-Wo(NIM)) 
      .                        + GB(NIM)*(yc-Zo(NIM))
                yref = Yo(NIM) + GC(NIM)*(xc-Wo(NIM)) 
@@ -8947,3 +8974,451 @@ c
       lenc = 0
       return
       end
+
+c--- ACS/WFC STDGDC support (from xym2mat_new.F) ---
+      logical function islinux()
+      implicit none
+ 
+      logical islinux_save
+ 
+      integer i
+      data i/0/
+      data islinux_save/.true./
+ 
+      common /islinux_/i,islinux_save
+ 
+      byte    b(2)
+      equivalence(i,b)
+ 
+      if (i.eq.1) goto 1
+ 
+      i = 1
+      islinux_save = .false.
+      if (b(1).eq.1) islinux_save = .true.
+ 
+    1 islinux = islinux_save
+      return
+      end
+
+c**** #include "/user/jayander/FORTRAN/GDC/STDGDCs/extract_stdgdc.f"
+c****                                         
+c*********************************************
+                                              
+ 
+c------------------------------------------------------
+c
+c
+c
+      subroutine extract_stdgdc(xr,yr,xc,yc,mc,FILE_STDGC,SENSE)
+      implicit none
+ 
+      real*8 xr, yr
+      real*8 xc, yc, mc
+      character*(*) FILE_STDGC
+      integer SENSE
+ 
+      save
+ 
+      logical FIRST
+      data    FIRST/.true./
+ 
+      character*200 FILE_STDGCu
+      character*200 FILE_STDGCc
+ 
+      integer   NDIM_XGC, NDIM_YGC
+      integer*4 XGC_0, NDIM_XCG
+      integer*4 YGC_0, NDIM_YCG
+ 
+      integer i, ios
+      integer k
+      character*08   FIELD
+      character*20   STREAM
+      character*2880 buffc
+ 
+      real*8  fx,   fy
+      real*8  xcu,  ycu
+      integer ipix, jpix
+ 
+      integer*4, dimension(:,:), allocatable :: xgc
+      integer*4, dimension(:,:), allocatable :: ygc
+      integer*2, dimension(:,:), allocatable :: mgc
+      integer*4, dimension(:,:), allocatable :: xcg
+      integer*4, dimension(:,:), allocatable :: ycg
+ 
+      if (FILE_STDGC(1:4).eq.'NONE'.or.
+     .    FILE_STDGC(1:4).eq.'NULL') then
+         if (SENSE.eq.0) then
+            mc = 0.
+            return
+            endif
+         if (SENSE.eq.1) then ! forward...
+            xc = xr
+            yc = yr
+            return
+            endif
+         if (SENSE.eq.-1) then ! forward...
+            xr = xc
+            yr = yc
+            return
+            endif
+         endif
+ 
+      if (FIRST) FILE_STDGCc = ' '
+ 
+      FILE_STDGCu = FILE_STDGC
+      do k = 196,2,-1
+         if (FILE_STDGCu(k:k+4).eq.'.fits')
+     .       FILE_STDGCu = FILE_STDGCu(1:k+4)
+         enddo
+ 
+      if (FILE_STDGCc.ne.FILE_STDGCu) then
+          FILE_STDGCc = FILE_STDGCu
+c         print*,'EXTRACT_STDGC --- OPEN(10): ',FILE_STDGCc
+          open(10,file=FILE_STDGCc,
+     .         status='old',
+     .         err   =900,
+     .         recl  =2880,
+     .         form  ='UNFORMATTED',
+     .         access='DIRECT')
+          i = 1
+          read(10,rec=i,iostat=ios) buffc
+          do k = 0, 35
+             FIELD  = buffc(k*80+01:k*80+08)
+             STREAM = buffc(k*80+11:k*80+30)
+             if (FIELD.eq.'NDIM_XGC') read(STREAM,*) NDIM_XGC
+             if (FIELD.eq.'NDIM_YGC') read(STREAM,*) NDIM_YGC
+             if (FIELD.eq.'NDIM_XCG') read(STREAM,*) NDIM_XCG
+             if (FIELD.eq.'NDIM_YCG') read(STREAM,*) NDIM_YCG
+             if (FIELD.eq.'XGC_0   ') read(STREAM,*) XGC_0
+             if (FIELD.eq.'YGC_0   ') read(STREAM,*) YGC_0
+             enddo
+          if (.not.FIRST) deallocate(xgc,ygc,mgc,xcg,ycg)
+          allocate(xgc(NDIM_XGC,NDIM_YGC))
+          allocate(ygc(NDIM_XGC,NDIM_YGC))
+          allocate(mgc(NDIM_XGC,NDIM_YGC))
+          allocate(xcg(NDIM_XCG,NDIM_YCG))
+          allocate(ycg(NDIM_XCG,NDIM_YCG))
+          i = 2
+          call getext_i4(xgc,NDIM_XGC,NDIM_YGC,i)
+          call getext_i4(ygc,NDIM_XGC,NDIM_YGC,i)
+          call getext_i2(mgc,NDIM_XGC,NDIM_YGC,i)
+          call getext_i4(xcg,NDIM_XCG,NDIM_YCG,i)
+          call getext_i4(ycg,NDIM_XCG,NDIM_YCG,i)
+          close(10)
+          FIRST = .false.
+          endif
+ 
+      if (SENSE.eq.1) then ! forward...
+          ipix = int(xr)
+          jpix = int(yr)
+          xc = -9999
+          yc = -9999
+ 
+          if (ipix.lt.       1-1) return
+          if (ipix.gt.NDIM_XGC+1) return
+          if (jpix.lt.       1-1) return
+          if (jpix.gt.NDIM_YGC+1) return
+ 
+          if (ipix.lt.1) ipix = 1
+          if (jpix.lt.1) jpix = 1
+          if (ipix.gt.NDIM_XGC-1) ipix = NDIM_XGC-1
+          if (jpix.gt.NDIM_YGC-1) jpix = NDIM_YGC-1
+ 
+          fx = xr-ipix
+          fy = yr-jpix
+          xc = (1-fx)*(1-fy)*xgc(ipix  ,jpix  )/1d5
+     .       + (1-fx)*( fy )*xgc(ipix  ,jpix+1)/1d5
+     .       + ( fx )*(1-fy)*xgc(ipix+1,jpix  )/1d5
+     .       + ( fx )*( fy )*xgc(ipix+1,jpix+1)/1d5
+          yc = (1-fx)*(1-fy)*ygc(ipix  ,jpix  )/1d5
+     .       + (1-fx)*( fy )*ygc(ipix  ,jpix+1)/1d5
+     .       + ( fx )*(1-fy)*ygc(ipix+1,jpix  )/1d5
+     .       + ( fx )*( fy )*ygc(ipix+1,jpix+1)/1d5
+          return
+          endif
+ 
+      if (SENSE.eq.0) then ! find the zeropoint...
+          ipix = int(xr)
+          jpix = int(yr)
+          mc = 0.000
+          if (ipix.lt.         1) return
+          if (ipix.gt.NDIM_XGC-1) return
+          if (jpix.lt.         1) return
+          if (jpix.gt.NDIM_YGC-1) return
+          fx = xr-ipix
+          fy = yr-jpix
+          mc = (1-fx)*(1-fy)*mgc(ipix  ,jpix  )/1d4
+     .       + (1-fx)*( fy )*mgc(ipix  ,jpix+1)/1d4
+     .       + ( fx )*(1-fy)*mgc(ipix+1,jpix  )/1d4
+     .       + ( fx )*( fy )*mgc(ipix+1,jpix+1)/1d4
+          return
+          endif
+ 
+      if (SENSE.eq.-1) then ! reverse
+          xcu =  1 + (xc-XGC_0)
+          ycu =  1 + (yc-YGC_0)
+          ipix = int(xcu)
+          jpix = int(ycu)
+          xr = -1
+          yr = -1
+          if (ipix.lt.         1) return
+          if (ipix.gt.NDIM_XCG-1) return
+          if (jpix.lt.         1) return
+          if (jpix.gt.NDIM_YCG-1) return
+          if (xcg(ipix  ,jpix  ).le.-2000000000) return
+          if (xcg(ipix+1,jpix  ).le.-2000000000) return
+          if (xcg(ipix  ,jpix+1).le.-2000000000) return
+          if (xcg(ipix+1,jpix+1).le.-2000000000) return
+           fx = xcu-ipix
+           fy = ycu-jpix
+           xr = (1-fx)*(1-fy)*xcg(ipix  ,jpix  )/1d5
+     .        + (1-fx)*( fy )*xcg(ipix  ,jpix+1)/1d5
+     .        + ( fx )*(1-fy)*xcg(ipix+1,jpix  )/1d5
+     .        + ( fx )*( fy )*xcg(ipix+1,jpix+1)/1d5
+           yr = (1-fx)*(1-fy)*ycg(ipix  ,jpix  )/1d5
+     .        + (1-fx)*( fy )*ycg(ipix  ,jpix+1)/1d5
+     .        + ( fx )*(1-fy)*ycg(ipix+1,jpix  )/1d5
+     .        + ( fx )*( fy )*ycg(ipix+1,jpix+1)/1d5
+           return
+           endif
+ 
+      print*,'ILLEGAL SENSE',SENSE
+      stop
+ 
+  900 continue
+      print*,'file open error'
+      print*,'  FILE_STDGCc: ',FILE_STDGCc
+      print*,'  FILE_SGDGC : ',FILE_STDGC
+      stop
+      end
+ 
+ 
+c--------------------------------------------------------------------
+c
+c
+      subroutine getext_i4(pix,NDIMX,NDIMY,i)
+      implicit none
+ 
+      integer NDIMX, NDIMY
+      integer*4 PIX(NDIMX,NDIMY)
+      integer i
+ 
+      integer o
+      integer nbyte0
+      integer nbyteE
+      integer nbyte1
+      integer nbyte2
+      integer nbper
+      integer ifirst, i1, i2, ios
+      integer np1, np2, npt
+      integer nbu, npu
+ 
+      character*2880 buffc
+      byte buffb(2880)
+      equivalence (buffc,buffb)
+ 
+      byte      b(4)
+      integer*4 ii
+      equivalence(ii,b)
+ 
+      integer ipix, jpix
+ 
+      logical islinux
+ 
+      ifirst = i+1
+      i1 = i
+      i2 = i
+ 
+      nbper  = 4*NDIMX*NDIMY
+      npt    =   NDIMX*NDIMY
+      nbyte1 = 1
+      nbyte2 = nbper
+      i1 = i+1 + nbyte1/2880
+      i2 = i+1 + nbyte2/2880
+ 
+      do i = i1, i2, 1
+         nbyte0 = (i-ifirst)*2880+   1
+         nbyteE = (i-ifirst)*2880+2880
+         np1 = (nbyte0-nbyte1)/4 + 1
+         np2 = (nbyteE-nbyte1)/4 + 1
+         read(10,rec=i,iostat=ios) buffc
+         do o = 1, 720
+            npu = np1+o-1
+            nbu = (o-1)*4
+            ii  = 0
+            ipix = npu - (npu-1)/NDIMX*NDIMX
+            jpix =   1 + (npu-1)/NDIMX
+            if (ipix.ge.1.and.ipix.le.NDIMX.and.
+     .          jpix.ge.1.and.jpix.le.NDIMY) then
+                if (.not.(islinux())) then
+                   b(1) = buffb(nbu+1)
+                   b(2) = buffb(nbu+2)
+                   b(3) = buffb(nbu+3)
+                   b(4) = buffb(nbu+4)
+                   endif
+                if ((islinux())) then
+                   b(4) = buffb(nbu+1)
+                   b(3) = buffb(nbu+2)
+                   b(2) = buffb(nbu+3)
+                   b(1) = buffb(nbu+4)
+                   endif
+                pix(ipix,jpix) = ii
+                endif
+            enddo!o
+         enddo!i
+ 
+      i = i2 + 1
+ 
+      return
+      end
+ 
+ 
+ 
+c--------------------------------------------------------------------
+c
+c
+      subroutine getext_i2(pix,NDIMX,NDIMY,i)
+      implicit none
+ 
+      integer NDIMX, NDIMY
+      integer*2 PIX(NDIMX,NDIMY)
+      integer i
+ 
+      integer o
+      integer nbyte0
+      integer nbyteE
+      integer nbyte1
+      integer nbyte2
+      integer nbper
+      integer ifirst, i1, i2, ios
+      integer np1, np2, npt
+      integer nbu, npu
+ 
+      character*2880 buffc
+      byte buffb(2880)
+      equivalence (buffc,buffb)
+ 
+      byte      b(2)
+      integer*2 ii
+      equivalence(ii,b)
+ 
+      integer ipix, jpix
+      logical islinux
+ 
+      ifirst = i+1
+      i1 = i
+      i2 = i
+ 
+      nbper  = 2*NDIMX*NDIMY
+      npt    =   NDIMX*NDIMY
+      nbyte1 = 1
+      nbyte2 = nbper
+      i1 = i+1 + nbyte1/2880
+      i2 = i+1 + nbyte2/2880
+ 
+      do i = i1, i2, 1
+         nbyte0 = (i-ifirst)*2880+   1
+         nbyteE = (i-ifirst)*2880+2880
+         np1 = (nbyte0-nbyte1)/2 + 1
+         np2 = (nbyteE-nbyte1)/2 + 1
+         read(10,rec=i,iostat=ios) buffc
+         do o = 1, 1440
+            npu = np1+o-1
+            nbu = (o-1)*2
+            ii  = 0
+            ipix = npu - (npu-1)/NDIMX*NDIMX
+            jpix =   1 + (npu-1)/NDIMX
+            if (ipix.ge.1.and.ipix.le.NDIMX.and.
+     .          jpix.ge.1.and.jpix.le.NDIMY) then
+                if (.not.(islinux())) then
+                   b(1) = buffb(nbu+1)
+                   b(2) = buffb(nbu+2)
+                   endif
+                if ((islinux())) then
+                   b(2) = buffb(nbu+1)
+                   b(1) = buffb(nbu+2)
+                   endif
+                pix(ipix,jpix) = ii
+                endif
+            enddo!o
+         enddo!i
+ 
+      i = i2 + 1
+ 
+      return
+      end
+ 
+                                              
+c*********************************************
+c****                                         
+c**** #include "/user/jayander/FORTRAN/GDC/STDGDCs/xryr2mc_stdgdc.f"
+c****                                         
+c*********************************************
+                                              
+ 
+c------------------------------------------------------
+c
+c mc should be the pixel area correction
+c
+c
+      subroutine xryr2mc_stdgdc(xr,yr,mc,FILE_STDGC)
+      implicit none
+ 
+      real*8 xr, yr
+      real*8 mc
+      character*(*) FILE_STDGC
+      real*8 xc, yc
+ 
+      call extract_stdgdc(xr,yr,xc,yc,mc,FILE_STDGC,0)  ! 0 = pix area correction
+ 
+      return
+      end
+ 
+ 
+                                              
+c*********************************************
+c****                                         
+c**** #include "/user/jayander/FORTRAN/GDC/STDGDCs/xryr2xcyc_stdgdc.f"
+c****                                         
+c*********************************************
+                                              
+ 
+c------------------------------------------------------
+c
+      subroutine xryr2xcyc_stdgdc(xr,yr,xc,yc,FILE_STDGC)
+      implicit none
+ 
+      real*8 xr, yr
+      real*8 xc, yc
+      character*(*) FILE_STDGC
+      real*8 mc
+ 
+      call extract_stdgdc(xr,yr,xc,yc,mc,FILE_STDGC,1)  ! 1 = forward
+ 
+      return
+      end
+ 
+ 
+                                              
+c*********************************************
+c****                                         
+c**** #include "/user/jayander/FORTRAN/GDC/STDGDCs/xcyc2xryr_stdgdc.f"
+c****                                         
+c*********************************************
+                                              
+ 
+c------------------------------------------------------
+c
+      subroutine xcyc2xryr_stdgdc(xc,yc,xr,yr,FILE_STDGC)
+      implicit none
+ 
+      real*8 xc, yc
+      real*8 xr, yr
+      character*(*) FILE_STDGC
+      real*8 mc
+ 
+      call extract_stdgdc(xr,yr,xc,yc,mc,FILE_STDGC,-1)  ! -1 = reverse
+ 
+      return
+      end
+

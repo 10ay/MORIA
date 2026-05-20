@@ -18521,13 +18521,9 @@ c 199    format(1x,i5.5,1x,4f9.3,1x,4f9.3,1x,4f8.3)
             SCL_N(NIM) = EXPT_N(N)/340.00
             FILE_STDGDC = 'NONE'
             if (V1I2.eq.1.and.INST.eq.1)
-     .          FILE_STDGDC = '/Users/skterry/code/fortran/hst/'
-     .                     // 'GDCs/'
-     .                     // 'STDGDC_OFFICIAL_JFRAME_ACSWFC_F606W.fits'
+     .          FILE_STDGDC = 'STDGDC_OFFICIAL_JFRAME_ACSWFC_F606W.fits'
             if (V1I2.eq.2.and.INST.eq.1)
-     .          FILE_STDGDC = '/Users/skterry/code/fortran/hst/'
-     .                     // 'GDCs/'
-     .                     // 'STDGDC_OFFICIAL_JFRAME_ACSWFC_F814W.fits'
+     .          FILE_STDGDC = 'STDGDC_OFFICIAL_JFRAME_ACSWFC_F814W.fits'
             if (V1I2.eq.1.and.INST.eq.2)
      .          FILE_STDGDC = 'STDGDC_WFC3UV_F606W.fits'
             if (V1I2.eq.2.and.INST.eq.2)

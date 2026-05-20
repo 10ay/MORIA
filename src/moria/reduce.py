@@ -164,6 +164,14 @@ _WFC3UV_REFERENCE_DOWNLOADS = (
     (_WFC3UV_STDGDC_BASE, "STDGDC_WFC3UV_F606W.fits", 7200.0),
 )
 
+_ACS_PSF_STDPSF_BASE = ("https://www.stsci.edu/~jayander/HST1PASS/LIB/PSFs/STDPSFs/ACSWFC")
+_ACS_STDGDC_BASE = ("https://www.stsci.edu/~jayander/HST1PASS/LIB/GDCs/STDGDCs/ACSWFC")
+_ACS_REFERENCE_DOWNLOADS = (
+    (_ACS_PSF_STDPSF_BASE, "STDPSF_ACSWFC_F814W_SM4.fits", 120.0),
+    (_ACS_PSF_STDPSF_BASE, "STDPSF_ACSWFC_F606W_SM4.fits", 120.0),
+    (_ACS_STDGDC_BASE, "STDGDC_OFFICIAL_JFRAME_ACSWFC_F606W.fits", 7200.0),
+    (_ACS_STDGDC_BASE, "STDGDC_OFFICIAL_JFRAME_ACSWFC_F814W.fits", 7200.0),
+)
 
 def _download_url_to_path(
     url: str,
@@ -195,6 +203,7 @@ def _download_url_to_path(
 
 
 def download_wfc3uv_psf_libraries(
+    camera: str,
     directory: str | Path,
     dest_subdirs: tuple[str, ...] = ("01.XYM", "03.LOC_TRANS"),
     overwrite: bool = False,
@@ -206,17 +215,6 @@ def download_wfc3uv_psf_libraries(
 
     Writes each file into every ``dest_subdirs`` folder under ``directory``
     (default ``01.XYM`` and ``03.LOC_TRANS``).
-
-    Sources:
-
-    - `PSF STDPSF`_ — ``PSFSTD_WFC3UV_F814W.fits``, ``PSFSTD_WFC3UV_F606W.fits``
-    - `WFC3UV PSFs`_ — ``PSFEFF_WFC3UV_F814W_C0.fits``, ``PSFEFF_WFC3UV_F606W_C0.fits``
-    - `STDGDC WFC3UV`_ — ``STDGDC_WFC3UV_F814W.fits``, ``STDGDC_WFC3UV_F606W.fits``
-      (~300 MiB each; allow several minutes per file)
-
-    .. _PSF STDPSF: https://www.stsci.edu/~jayander/WFC3/WFC3UV_PSFs/STDPSF/
-    .. _WFC3UV PSFs: https://www.stsci.edu/~jayander/WFC3/WFC3UV_PSFs/
-    .. _STDGDC WFC3UV: https://www.stsci.edu/~jayander/HST1PASS/LIB/GDCs/STDGDCs/WFC3UV/
     """
     root = Path(directory).resolve()
     results: dict[str, list[str]] = {"downloaded": [], "skipped": []}
@@ -224,12 +222,19 @@ def download_wfc3uv_psf_libraries(
     if verbose:
         print(f"MORIA reference FITS → {root}", flush=True)
 
+    if camera == "WFC3UV":
+        reference_downloads = _WFC3UV_REFERENCE_DOWNLOADS
+    elif camera == "ACS":
+        reference_downloads = _ACS_REFERENCE_DOWNLOADS
+    else:
+        raise ValueError(f"Invalid camera: {camera}")
+
     for sub in dest_subdirs:
         dest_dir = root / sub
         dest_dir.mkdir(parents=True, exist_ok=True)
         if verbose:
             print(f"  [{sub}]", flush=True)
-        for base_url, name, file_timeout in _WFC3UV_REFERENCE_DOWNLOADS:
+        for base_url, name, file_timeout in reference_downloads:
             url = base_url.rstrip("/") + "/" + name
             out_path = dest_dir / name
             if out_path.exists() and not overwrite:
@@ -251,8 +256,8 @@ def download_wfc3uv_psf_libraries(
     return results
 
 
-def data_prep_early(destination):
-    download_wfc3uv_psf_libraries(destination)
+def data_prep_early(camera, destination):
+    download_wfc3uv_psf_libraries(camera, destination)
 
     fortran_src = get_fortran_dir()
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xOg"])
@@ -512,7 +517,7 @@ def _write_xym2bar_run_scripts(field_root: Path) -> None:
         (fdir_V / "run_xym2bar.src").write_text(f"./xym2bar.xOg {nim_V} I DMATCH=8\ncp -p MATCHUP.XYMEEE MATCHUP.F606W.XYM\n", encoding="utf-8")
 
     
-def matchup_files(directory):
+def matchup_files(camera,directory):
     """
     Run the scripts to create MATCHUP Files on _WJ2 files in F814W and F606W subdirectories.
     """
@@ -522,6 +527,24 @@ def matchup_files(directory):
         Run hst1pass on exposures in the F814W and F606W filters.
         """
         log_file = Path(directory).resolve() / "01.XYM" / "log_files" / "reduce_wfc3.log"
+        base_dir = Path(directory).resolve() / "01.XYM"
+        script_path = base_dir / script
+        with open(log_file, "w") as logf:
+            subprocess.run(
+                ["bash", str(script_path)],
+                cwd=base_dir,
+                stdout=logf,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+                env=os.environ,
+            )
+
+    def reduce_acs(directory, script='reduce_acs.src'):
+        """
+        Run hst1pass on exposures in the F814W and F606W filters.
+        """
+        log_file = Path(directory).resolve() / "01.XYM" / "log_files" / "reduce_acs.log"
         base_dir = Path(directory).resolve() / "01.XYM"
         script_path = base_dir / script
         with open(log_file, "w") as logf:
@@ -581,7 +604,13 @@ def matchup_files(directory):
                 env=os.environ,
             )
 
-    reduce_wfc3(directory)
+    if camera == "WFC3UV":
+        reduce_wfc3(directory)
+    elif camera == "ACS":
+        reduce_acs(directory)
+    else:
+        raise ValueError(f"Invalid camera: {camera}")
+
     no_gaia_matchup(directory)
    
 
@@ -642,6 +671,7 @@ def write_run_xym2mat_src_loc_trans(output_path: Path, xym_dir: Path) -> None:
 
 
 def write_in_img2sam_wfc3uv_loc_trans(
+    camera: str,
     output_path: Path,
     data_dir: Path,
 ) -> None:
@@ -654,11 +684,18 @@ def write_in_img2sam_wfc3uv_loc_trans(
         idx = 1
         for filter_name, chip in (("F814W", 8), ("F606W", 6)):
             fits_dir = data_dir / filter_name
-            names = sorted(
-                p.name
-                for p in fits_dir.iterdir()
-                if p.is_file() and p.name.endswith("_WJC.fits")
-            )
+            if camera == "WFC3UV":
+                names = sorted(
+                    p.name
+                    for p in fits_dir.iterdir()
+                    if p.is_file() and p.name.endswith("_WJC.fits")
+                )
+            else:
+                names = sorted(
+                    p.name
+                    for p in fits_dir.iterdir()
+                    if p.is_file() and p.name.endswith("_WJ2.fits")
+                )
             if len(names) != 2:
                 raise FileNotFoundError(
                     f"write_in_img2sam_wfc3uv_loc_trans: need exactly two *_WJC.fits "
@@ -669,7 +706,7 @@ def write_in_img2sam_wfc3uv_loc_trans(
                 idx += 1
 
 
-def data_prep_loc_trans(directory, filters = 'F814W'):
+def data_prep_loc_trans(camera,directory, filters = 'F814W'):
     """
     Prepare LOC_TRANS inputs: copy star lists and FITS into ``03.LOC_TRANS``,
     write ``IN.img2sam_wfc3uv``, and write ``run_xym2mat.src`` (``xym2mat_new.e``
@@ -703,11 +740,11 @@ def data_prep_loc_trans(directory, filters = 'F814W'):
     output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
     output_run_xym2mat = os.path.join(output_file_dir, "run_xym2mat.src")
     write_run_xym2mat_src_loc_trans(Path(output_run_xym2mat), base_dir_one)
-    write_in_img2sam_wfc3uv_loc_trans(Path(output_file_img2sam), base_dir / "00.DATA")
+    write_in_img2sam_wfc3uv_loc_trans(camera,Path(output_file_img2sam), base_dir / "00.DATA")
 
     return
 
-def loc_trans(directory):
+def loc_trans(camera,directory):
     """
     Run the local transformation scripts in F814W and F606W subdirectories to extract 
     the pixels from each exposure and accurately transform their locations into the 
@@ -786,7 +823,7 @@ def loc_trans(directory):
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
                 
-    data_prep_loc_trans(directory)
+    data_prep_loc_trans(camera, directory)
     run_xym2mat(directory)
     run_img2extract_wfc3uv_psflist(directory)
     run_img2extract_wfc3uv_psflist_Cal(directory)
