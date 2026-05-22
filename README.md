@@ -14,7 +14,9 @@ Git clone the repository, and run 'pip install -e .' in the src folder. Don't fo
 
 ## Tutorial
 
-We have notebooks in the 'demo/notebook' folder to show how to run each step of the pipeline. The order of notebooks is as follows:
+We have notebooks in the 'demo/notebook' folder to show how to run each step of the pipeline. 
+
+The order of notebooks is as follows:
 
     output_stacks.ipynb
     cmd_diagram.ipynb
@@ -22,7 +24,9 @@ We have notebooks in the 'demo/notebook' folder to show how to run each step of 
     fitting_psfs.ipynb
     calibrations.ipynb
 
-The notebook was run on the target KMT-BLG-2019-0253. 
+The recommended way to run MORIA is to copy everything in demo/notebook to the same repository level at which you perform the data analysis. 
+
+The notebook was run on the target KMT-BLG-2019-0253. If the notebook you download via the git clone command do not open, physically download them. In the 'demo' folder, we store both Jupyter notebooks (in demo/notebook) and PDF version of the notebooks (in demo/pdf_notebook)
 
 Lastly, there is an optional notebook to facilitate a coordinate transformation between the highest resolution HST and Keck images. This can be used if we want to use the Keck analysis to constrain the lens-source separation in the HST images. The notebook below gives instructions on how to run keck_calib.ipynb. 
 
