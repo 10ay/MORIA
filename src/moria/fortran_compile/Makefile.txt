@@ -1,5 +1,19 @@
-# Fortran compiler
-F77 = gfortran-mp-14
+# Fortran compiler: first match on PATH (override with make F77=... or env F77/FC)
+# macOS /bin/make predefines FC=f77; only auto-detect when user has not set FC/F77
+F77_CANDIDATES := gfortran \
+	gfortran-mp-15 gfortran-mp-14 gfortran-mp-13 gfortran-mp-12 \
+	gfortran-15 gfortran-14 gfortran-13 gfortran-12 gfortran-11 \
+	ifort ifx flang nvfortran
+F77_DETECTED := $(firstword $(foreach cmd,$(F77_CANDIDATES),$(if $(shell command -v $(cmd) 2>/dev/null),$(cmd),)))
+ifeq ($(origin FC),default)
+FC := $(F77_DETECTED)
+endif
+ifeq ($(origin F77),default)
+F77 := $(FC)
+endif
+ifndef F77
+$(error No Fortran compiler found on PATH. Install gfortran or run: make F77=/path/to/compiler)
+endif
 # Flags
 OPT = -g
 
