@@ -2,15 +2,15 @@
 
 ## How to Install
 
-The easiest way to install this code is to first clone it. You can do this by running the command below:
+The easiest way to install MORIA is to first clone it. You can do this by running the command below:
 
     git clone https://github.com/10ay/MORIA.git
 
-Once installed, navigate to inside the MORIA folder and run:
+Once installed, open MORIA from the terminal using 'cd MORIA'. Then run:
 
     pip install -e .
 
-Git clone the repository, and run 'pip install -e .' in the src folder. Don't forget the dot after the '-e'. 
+Don't forget the dot after the '-e'. 
 
 ## Tutorial
 
@@ -18,21 +18,21 @@ We have notebooks in the 'demo/notebook' folder to show how to run each step of 
 
 The order of notebooks is as follows:
 
-    output_stacks.ipynb
-    cmd_diagram.ipynb
-    creating_psf.ipynb
-    fitting_psfs.ipynb
-    calibrations.ipynb
+    00.output_stacks.ipynb
+    01.cmd_diagram.ipynb
+    02.creating_psf.ipynb
+    03.fitting_psfs.ipynb
+    04.calibrations.ipynb
 
-The recommended way to run MORIA is to copy everything in demo/notebook to the same repository level at which you perform the data analysis. 
+The recommended way to run MORIA is to copy everything in demo/notebook to the same repository level at which you want to perform the data analysis. 
 
-The notebook was run on the target KMT-BLG-2019-0253. If the notebook you download via the git clone command do not open, physically download them. In the 'demo' folder, we store both Jupyter notebooks (in demo/notebook) and PDF version of the notebooks (in demo/pdf_notebook)
+The demo notebooks were run on the target KMT-BLG-2019-0253. In the 'demo' folder, we store both: Jupyter notebooks (in demo/notebook) and their respective PDFs (in demo/pdf_notebook)
 
-Lastly, there is an optional notebook to facilitate a coordinate transformation between the highest resolution HST and Keck images. This can be used if we want to use the Keck analysis to constrain the lens-source separation in the HST images. The notebook below gives instructions on how to run keck_calib.ipynb. 
+Lastly, there is an optional notebook to facilitate a coordinate transformation between the highest resolution HST and Keck images. This can be used if you want to use the Keck analysis to constrain the lens-source separation in the HST images. This notebook is called:
 
-    keck_calib.ipynb
+    opt.keck_calib.ipynb
 
-Note that keck_calib.ipynb was not run with KMT-BLG-2019-0253 but a different target.
+Note that keck_calib.ipynb was not run on KMT-BLG-2019-0253 but on a different target.
 
 ## Dependencies
 
@@ -48,7 +48,7 @@ The entire pipeline is also summarized in detail [here](https://docs.google.com/
 
 ## Acknowledgment 
 
-This following scientific publications should be acknowledged by a citation to the works relevant to your study:
+This following scientific publication should be acknowledged by a citation to the works relevant to your study:
 
 [Bhadra, T. D. et al. “You Shall Not Pass (Without Modeling): High-Resolution Analysis of KMT-2019-BLG-0253 using MORIA.”](https://arxiv.org/abs/2605.08340)
 

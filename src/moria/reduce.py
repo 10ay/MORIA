@@ -667,10 +667,10 @@ def cmd_diagram(directory):
     #Establish target parameters
     response = str(input("Do you have a target? Enter 'Yes' if you do."))
     if response == 'yes' or response == 'Yes':
-        xtarg = float(input("Enter x-coord of your target"))
-        ytarg = float(input("Enter y-coord of your target"))
-        Vtarg = float(input("Enter V magnitude of your target"))
-        Itarg = float(input("Enter I magnitude of your target"))
+        xtarg = float(input("Enter x-coord of your target (from MATCHUP.F814W.XYM.02)"))
+        ytarg = float(input("Enter y-coord of your target (from MATCHUP.F814W.XYM.02)"))
+        Vtarg = float(input("Enter V magnitude of your target (from MATCHUP.F606W.XYM)"))
+        Itarg = float(input("Enter I magnitude of your target (from MATCHUP.F814W.XYM.02)"))
     else:
 #        pdb.set_trace()
         xtarg, ytarg = xi[0], yi[0]
@@ -703,15 +703,14 @@ def cmd_diagram(directory):
     
         #Plotting parameters 
         if response == 'yes' or response == 'Yes':
-    
-            rad_max = float(input("Enter maximum plotting radius"))
-            box_max = float(input("Enter maximum box radius"))
-            mag_range = float(input("Enter magnitude range for plotting"))
-            col_range = float(input("Enter color range for plotting"))
-            ref_st_Imx = float(input("Enter reference star input I max"))
-            ref_st_Imn = float(input("Enter reference star input I min"))
-            ref_st_Vmx = float(input("Enter reference star input V max"))
-            ref_st_Vmn = float(input("Enter reference star input V min"))
+            rad_max = float(input("Enter maximum plotting radius for PSF selection(recommended: 300)"))
+            box_max = float(input("Enter maximum box radius for PSF selection(recommended: 300)"))
+            mag_range = float(input("Enter magnitude range for plotting of PSF selection (recommended: 0.50)"))
+            col_range = float(input("Enter color range for plotting of PSF selection (recommended: 0.30)"))
+            ref_st_Imx = float(input("Enter reference star input I max (recommended: I-mag + 2)"))
+            ref_st_Imn = float(input("Enter reference star input I min (recommended: I-mag - 2)"))
+            ref_st_Vmx = float(input("Enter reference star input V max (recommended: V-mag + 2)"))
+            ref_st_Vmn = float(input("Enter reference star input V min (recommended: V-mag - 2)"))
         else:
             rad_max, box_max = 300, 300
             mag_range, col_range = 0.50, 0.30
@@ -750,6 +749,7 @@ def cmd_diagram(directory):
         ax_cmd.scatter([VmItarg], [Itarg], marker='x', lw = 5, s=100, c='grey', label='Target')
         ax_cmd.set_xlim(-0.75, 1.75)
         ax_cmd.set_ylim(-15, -7)   
+        ax_cmd.invert_yaxis()
         ax_cmd.set_xlabel('F606W - F814W')
         ax_cmd.set_ylabel('F814W')
         ax_cmd.legend(loc = 'lower right')
@@ -824,12 +824,12 @@ def cmd_diagram(directory):
         #Plotting parameters 
         if response == 'yes' or response == 'Yes':
 
-            rad_max = float(input("Enter maximum plotting radius"))
-            box_max = float(input("Enter maximum box radius"))
-            Vcalc = float(input("Enter V magnitude for calibration"))
-            Icalc = float(input("Enter I magnitude for calibration"))
-            mag_range = float(input("Enter magnitude range for plotting"))
-            col_range = float(input("Enter color range for plotting"))
+            rad_max = float(input("Enter maximum plotting radius for calibration stars selection (recommended: 300)"))
+            box_max = float(input("Enter maximum box radius for calibration stars selection (recommended: 300)"))
+            Vcalc = float(input("Enter V magnitude for calibration (recommended: -13)"))
+            Icalc = float(input("Enter I magnitude for calibration (recommended: -13)"))
+            mag_range = float(input("Enter magnitude range for plotting of calibration stars (recommended: 1.5)"))
+            col_range = float(input("Enter color range for plotting of calibration stars (recommended: 1.2)"))
         else:
             rad_max, box_max = 300, 300
             mag_range, col_range = 0.50, 0.30
@@ -855,6 +855,7 @@ def cmd_diagram(directory):
         ax_cmd.scatter([VmItarg], [Itarg], marker='x', lw =5, s=100, c='grey', label='Target')
         ax_cmd.set_xlim(-0.75, 1.25)
         ax_cmd.set_ylim(-15, -7)
+        ax_cmd.invert_yaxis()
         ax_cmd.set_xlabel('F606W - F814W')
         ax_cmd.set_ylabel('F814W')
         ax_cmd.set_title('CMD')
@@ -1016,31 +1017,26 @@ def hst_fit_dataprep_twostar(directory, f = 'F814W'):
 
     x1 = float(input("Initial x position for object 1"))
     y1 = float(input("Initial y position for object 1"))
-
     x2 = float(input("Initial x position for object 2"))
     y2 = float(input("Initial y position for object 2"))
- 
-    x3 = float(input("Initial x position for object 3"))
-    y3 = float(input("Initial y position for object 3"))
-
+    x3 = float(0)
+    y3 = float(0)
     f1 = float(input("Initial flux for object 1"))
     f2 = float(input("Initial flux for object 2"))
+    mcmc_dr1 = float(input("MCMC jump step for object 1's position."))
+    mcmc_dr2 = float(input("MCMC jump step for object 2's position."))
+    mcmc_dr3 = float(0)
+    mcmc_df1 = float(input("MCMC jump step for flux of object 1"))
+    mcmc_df2 = float(input("MCMC jump step for flux of object 2"))
 
-    mcmc_dr1 = float(input("Maximum MCMC jump size for object 1"))
-    mcmc_dr2 = float(input("Maximum MCMC jump size for object 2"))
-    mcmc_dr3 = float(input("Maximum MCMC jump size for object 3"))
-    mcmc_df1 = float(input("Maximum MCMC jump size for flux of object 1"))
-    mcmc_df2 = float(input("Maximum MCMC jump size for flux of object 2"))
-
-    nmcmc = int(input("MCMC step sizes (Recommended: >50000)"))
-
+    nmcmc = int(input("Total MCMC steps (recommended > 50000)"))
     fudge = float(input("Input fudge factor. Input 1.0 if you don't know what this is"))
-
-    dufitmn = float(input("Minimum du cut"))
-    dufitmx = float(input("Maximum du cut"))
-    dvfitmn =float(input("Minimum dv cut"))
-    dvfitmx = float(input("Maximum dv cut"))
-    chi2cut = float(input("Chi-squared cut"))
+    dufitmn = float(input("Minimum du cut (minimum distance in x-direction)"))
+    dufitmx = float(input("Maximum du cut (maximum distance in x-direction)"))
+    dvfitmn =float(input("Minimum dv cut (minimum distance in y-direction)"))
+    dvfitmx = float(input("Maximum dv cut (maximum distance in y-direction)"))
+    chi2cut = float(input("Chi-square cut for pixel selection"))
+    
 
     
     if f == 'F814W':
@@ -1095,21 +1091,19 @@ def hst_fit_dataprep_threestar(directory, f = 'F814W'):
     f1 = float(input("Initial flux for object 1"))
     f2 = float(input("Initial flux for object 2"))
 
-    mcmc_dr1 = float(input("Maximum MCMC jump size for object 1"))
-    mcmc_dr2 = float(input("Maximum MCMC jump size for object 2"))
-    mcmc_dr3 = float(input("Maximum MCMC jump size for object 3"))
-    mcmc_df1 = float(input("Maximum MCMC jump size for flux of object 1"))
-    mcmc_df2 = float(input("Maximum MCMC jump size for flux of object 2"))
+    mcmc_dr1 = float(input("MCMC jump step for object 1's position."))
+    mcmc_dr2 = float(input("MCMC jump step for object 2's position."))
+    mcmc_dr3 = float(input("MCMC jump step for object 3's position."))
+    mcmc_df1 = float(input("MCMC jump step for flux of object 1"))
+    mcmc_df2 = float(input("MCMC jump step for flux of object 2"))
 
-    nmcmc = int(input("MCMC step sizes"))
-
+    nmcmc = int(input("Total MCMC steps (recommended > 50000)"))
     fudge = float(input("Input fudge factor. Input 1.0 if you don't know what this is"))
-
-    dufitmn = float(input("Minimum du cut"))
-    dufitmx = float(input("Maximum du cut"))
-    dvfitmn =float(input("Minimum dv cut"))
-    dvfitmx = float(input("Maximum dv cut"))
-    chi2cut = float(input("Chi-squared cut"))
+    dufitmn = float(input("Minimum du cut (minimum distance in x-direction)"))
+    dufitmx = float(input("Maximum du cut (maximum distance in x-direction)"))
+    dvfitmn =float(input("Minimum dv cut (minimum distance in y-direction)"))
+    dvfitmx = float(input("Maximum dv cut (maximum distance in y-direction)"))
+    chi2cut = float(input("Chi-square cut for pixel selection"))
 
     
     if f == 'F814W':
@@ -1163,21 +1157,19 @@ def hst_fit_dataprep_onestar(directory, f = 'F814W'):
     f1 = float(1)
     f2 = float(0)
 
-    mcmc_dr1 = float(input("Maximum MCMC jump size for object 1"))
+    mcmc_dr1 = float(input("MCMC jump step for object 1's position."))
     mcmc_dr2 = float(0)
     mcmc_dr3 = float(0)
-    mcmc_df1 = float(input("Maximum MCMC jump size for flux of object 1"))
+    mcmc_df1 = float(0)
     mcmc_df2 = float(0)
 
-    nmcmc = int(input("MCMC step sizes"))
-
+    nmcmc = int(input("Total MCMC steps (recommended > 50000)"))
     fudge = float(input("Input fudge factor. Input 1.0 if you don't know what this is"))
-
-    dufitmn = float(input("Minimum du cut"))
-    dufitmx = float(input("Maximum du cut"))
-    dvfitmn =float(input("Minimum dv cut"))
-    dvfitmx = float(input("Maximum dv cut"))
-    chi2cut = float(input("Chi-squared cut"))
+    dufitmn = float(input("Minimum du cut (minimum distance in x-direction)"))
+    dufitmx = float(input("Maximum du cut (maximum distance in x-direction)"))
+    dvfitmn =float(input("Minimum dv cut (minimum distance in y-direction)"))
+    dvfitmx = float(input("Maximum dv cut (maximum distance in y-direction)"))
+    chi2cut = float(input("Chi-square cut for pixel selection"))
 
     if f == 'F814W':
         content = [
@@ -1586,6 +1578,7 @@ def tri_fit_F606W_opt(directory):
     
     fortran_src = get_fortran_dir()
     copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit", filename="mcmc_expand_average.xOg")
     run_uvp2psf_simst_2(directory)
     strip_star_lines_from_uvp2tri_mcmc_606W(directory)
     run_mcmc_expand_average_606W(directory)
