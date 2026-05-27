@@ -669,8 +669,8 @@ def cmd_diagram(directory):
     if response == 'yes' or response == 'Yes':
         xtarg = float(input("Enter x-coord of your target (from MATCHUP.F814W.XYM.02)"))
         ytarg = float(input("Enter y-coord of your target (from MATCHUP.F814W.XYM.02)"))
-        Vtarg = float(input("Enter V magnitude of your target (from MATCHUP.F606W.XYM)"))
-        Itarg = float(input("Enter I magnitude of your target (from MATCHUP.F814W.XYM.02)"))
+        Vtarg = float(input("Enter F606W instrumental magnitude of your target (from MATCHUP.F606W.XYM)"))
+        Itarg = float(input("Enter F814W instrumental magnitude of your target (from MATCHUP.F814W.XYM.02)"))
     else:
 #        pdb.set_trace()
         xtarg, ytarg = xi[0], yi[0]
@@ -707,10 +707,10 @@ def cmd_diagram(directory):
             box_max = float(input("Enter maximum box radius for PSF selection(recommended: 300)"))
             mag_range = float(input("Enter magnitude range for plotting of PSF selection (recommended: 0.50)"))
             col_range = float(input("Enter color range for plotting of PSF selection (recommended: 0.30)"))
-            ref_st_Imx = float(input("Enter reference star input I max (recommended: I-mag + 2)"))
-            ref_st_Imn = float(input("Enter reference star input I min (recommended: I-mag - 2)"))
-            ref_st_Vmx = float(input("Enter reference star input V max (recommended: V-mag + 2)"))
-            ref_st_Vmn = float(input("Enter reference star input V min (recommended: V-mag - 2)"))
+            ref_st_Imx = float(input("Enter reference star input I max (recommended: F814W mag + 2)"))
+            ref_st_Imn = float(input("Enter reference star input I min (recommended: F814W mag - 2)"))
+            ref_st_Vmx = float(input("Enter reference star input V max (recommended: F606W mag + 2)"))
+            ref_st_Vmn = float(input("Enter reference star input V min (recommended: F606W mag - 2)"))
         else:
             rad_max, box_max = 300, 300
             mag_range, col_range = 0.50, 0.30
@@ -826,8 +826,8 @@ def cmd_diagram(directory):
 
             rad_max = float(input("Enter maximum plotting radius for calibration stars selection (recommended: 300)"))
             box_max = float(input("Enter maximum box radius for calibration stars selection (recommended: 300)"))
-            Vcalc = float(input("Enter V magnitude for calibration (recommended: -13)"))
-            Icalc = float(input("Enter I magnitude for calibration (recommended: -13)"))
+            Vcalc = float(input("Enter F606W magnitude for calibration (recommended: -13)"))
+            Icalc = float(input("Enter F814W magnitude for calibration (recommended: -13)"))
             mag_range = float(input("Enter magnitude range for plotting of calibration stars (recommended: 1.5)"))
             col_range = float(input("Enter color range for plotting of calibration stars (recommended: 1.2)"))
         else:
