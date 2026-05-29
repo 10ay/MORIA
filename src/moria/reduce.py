@@ -940,8 +940,9 @@ def extract_psf_1(directory):
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS" / "F606W", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W")
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W")
-    f814_images   = int(input("Enter the number of images for the F814W filter: "))
-    f606_images   = int(input("Enter the number of images for the F606W filter: "))
+    f814_images   = int(input("Enter the number of images for the F814W filter: ")) #Bug here, fix.
+    f606_images   = int(input("Enter the number of images for the F606W filter: ")) #Bug here, fix.
+    num_simstars = int(input("Enter the total number of PSF ref stars [from NEARBY_SIM_STARS file]: ")) #possible fix for above^
     
     def prepare_data(images, directory, f= 'F814W'):
         base_dir = Path(directory).resolve()
