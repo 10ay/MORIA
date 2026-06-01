@@ -78,6 +78,11 @@ def uvp2tri_fsky_outputs_missing(fit_dir, output_names):
     return [name for name in output_names if not (fit_dir / name).is_file()]
 
 
+def remove_uvp2tri_fsky_outputs(fit_dir, output_names):
+    for name in output_names:
+        (fit_dir / name).unlink(missing_ok=True)
+
+
 def run_uvp2tri_mcmc_csh(directory, filter_name, fit_folder, script, log_basename):
     base_dir = Path(directory).resolve() / "06.FIT" / filter_name
     subdir = base_dir / fit_folder
@@ -105,6 +110,7 @@ def run_uvp2tri_mcmc(directory, filter_name, fit_folders, output_names):
     for fit_folder in fit_folders:
         fit_dir = base_dir / fit_folder
         if uvp2tri_fsky_outputs_missing(fit_dir, output_names):
+            remove_uvp2tri_fsky_outputs(fit_dir, output_names)
             run_uvp2tri_mcmc_csh(
                 directory,
                 filter_name,
