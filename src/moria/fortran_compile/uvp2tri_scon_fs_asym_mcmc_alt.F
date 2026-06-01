@@ -601,8 +601,8 @@ c      ---------------------
      .        9x,4f8.3,f13.4,f13.1,g14.5)
  992   format(i8)
  993   format(i4,8f10.5,2f13.4,30f10.4)
- 994   format('removing pix at img, du, dv, val, chi2 =',i4,2f10.4,f10.2,
-     &        g13.5)
+ 994   format('removing pix at img, du, dv, val, chi2 =',
+     &     i4,2f10.4,f10.2,g13.5)
 
 
 36     continue
