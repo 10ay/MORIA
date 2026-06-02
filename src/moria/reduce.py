@@ -120,6 +120,32 @@ def run_uvp2tri_mcmc(directory, filter_name, fit_folders, output_names):
             )
 
 
+_MCMC_ACCEPTANCE_RE = re.compile(
+    r"accepted,\s*rejected\s+MCMC\s+steps:\s*(\d+)\s+(\d+)",
+    re.IGNORECASE,
+)
+
+
+def print_uvp2tri_mcmc_acceptance_rate(directory, filter_name, fit_folders):
+    """Read uvp2tri_scon_fs_asym_mcmc.log and print the MCMC acceptance rate."""
+    base_dir = Path(directory).resolve() / "06.FIT" / filter_name
+    fit_folders = ['1star-fit', '2star-fit']
+    for fit_folder in fit_folders:
+        log_file = base_dir / fit_folder / "log_files" / "uvp2tri_scon_fs_asym_mcmc.log"
+        if not log_file.is_file():
+            print(f"{filter_name}/{fit_folder}: log file not found: {log_file}")
+            continue
+        matches = _MCMC_ACCEPTANCE_RE.findall(log_file.read_text())
+        naccept, nreject = map(int, matches[-1])
+        total = naccept + nreject
+        rate = naccept / total if total else 0.0
+        if fit_folder == '1star-fit':
+            string_1star = str(f"{filter_name}/{fit_folder}: MCMC acceptance rate = {rate:.4f} "f"({naccept} accepted, {nreject} rejected)")
+        elif fit_folder == '2star-fit':
+            string_2star = str(f"{filter_name}/{fit_folder}: MCMC acceptance rate = {rate:.4f} "f"({naccept} accepted, {nreject} rejected)")
+    return string_1star, string_2star
+
+
 def data_prep_early(destination):
     fortran_src = get_fortran_dir()
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xOg"])
@@ -1418,8 +1444,11 @@ def hst_fit_final_F814W(directory):
     copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "2star-fit", extensions=[".fits"])
 
     run_uvp2tri_mcmc(directory, "F814W", folders, UVP2TRI_FSKY_OUTPUTS_F814W)
+    #pdb.set_trace()
+    string_1star, string_2star =  print_uvp2tri_mcmc_acceptance_rate(directory, "F814W", folders)
     strip_star_lines_from_uvp2tri_mcmc_814W(directory)
     run_mcmc_expand_average_814W(directory)
+    return string_1star, string_2star
 
 
 
@@ -1476,9 +1505,10 @@ def hst_fit_final_F606W(directory):
             (_fit_2star / name).unlink(missing_ok=True)
 
     run_uvp2tri_mcmc(directory, "F606W", folders, UVP2TRI_FSKY_OUTPUTS_F606W)
+    star_1fit, star_2fit = print_uvp2tri_mcmc_acceptance_rate(directory, "F606W", folders)
     strip_star_lines_from_uvp2tri_mcmc_606W(directory)
     run_mcmc_expand_average_606W(directory)
-
+    return star_1fit, star_2fit
 
 def tri_fit_F606W_opt(directory):
     """
