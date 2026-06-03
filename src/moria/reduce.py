@@ -2084,3 +2084,38 @@ def ogle_field_chip_candidates_from_coords(
 
     return candidates
 
+
+def notebook_complete(message: str | None = None) -> None:
+    """
+    Call at the end of a MORIA notebook when the final pipeline step is done.
+
+    Prints the Doors of Durin (ASCII art), plus an optional completion message.
+
+    Parameters
+    ----------
+    message : str, optional
+        Short note to print under the portrait (e.g. notebook name or step).
+    """
+    portrait = (Path(__file__).resolve().parent / "doors_of_durin.txt").read_text(
+        encoding="utf-8"
+    )
+    print(portrait)
+    if message:
+        print(f"  >> {message}")
+    print("  >> MORIA notebook complete. The doors are open.\n")
+
+
+
+
+def notebook_complete_fit():
+    """
+    Call at the end of fitting_psfs.ipynb when PSF fitting is done.
+
+    Prints gollum.
+    """
+    portrait = (
+        Path(__file__).resolve().parent / "gollum.txt"
+    ).read_text(encoding="utf-8")
+    print(portrait)
+    print("  >> Gollum Calls You His Precious")
+

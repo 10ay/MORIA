@@ -31,6 +31,8 @@ from .reduce import (
     fit_calibration,
     download_ogle_map_and_reference,
     ogle_field_chip_candidates_from_coords,
+    notebook_complete,
+    notebook_complete_fit,
 )
 
 __all__ = [
