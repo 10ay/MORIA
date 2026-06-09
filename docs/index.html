@@ -10,13 +10,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="page-home">
 
   <nav class="nav">
     <span class="nav-brand">MORIA</span>
     <ul class="nav-links">
       <li><a href="#deep">About MORIA</a></li>
-      <li><a href="#path">The Path</a></li>
+      <li><a href="#scrolls">The Path</a></li>
       <li><a href="#fellowship">Join The Fellowship</a></li>
     </ul>
   </nav>
@@ -55,53 +55,71 @@
       </p>
     </section>
 
-    <section class="section" id="path">
+    <section class="section" id="scrolls">
       <div class="section-divider"></div>
-      <h2>The Path Through The Deep of Khazad-dûm</h2>
+      <h2>The Path</h2>
       <p class="section-lead">
-        Follow the demo notebooks in order. 
+        Follow the demo notebooks in order.
       </p>
       <div class="quest-path">
         <article class="quest-step">
           <div>
             <h3>Output Stacks</h3>
             <p>Prepare and stack HST images. Build a starlist from the images.</p>
-            <p><code>00.output_stacks.ipynb</code></p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="notebooks/00.output_stack.pdf" target="_blank" rel="noopener">Open PDF</a>
+              <code>00.output_stacks.ipynb</code>
+            </p>
           </div>
         </article>
         <article class="quest-step">
           <div>
             <h3>CMD Diagram</h3>
             <p>Make a CMD diagram + identify stars with colors and magnitudes similar to the target.</p>
-            <p><code>01.cmd_diagram.ipynb</code></p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="notebooks/01.cmd_diagram.pdf" target="_blank" rel="noopener">Open PDF</a>
+              <code>01.cmd_diagram.ipynb</code>
+            </p>
           </div>
         </article>
         <article class="quest-step">
           <div>
             <h3>Create a PSF</h3>
             <p>Construct a PSF model using stars selected to have colors and magnitudes similar to those of the target star. </p>
-            <p><code>02.creating_psf.ipynb</code></p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="notebooks/02.creating_psf.pdf" target="_blank" rel="noopener">Open PDF</a>
+              <code>02.creating_psf.ipynb</code>
+            </p>
           </div>
         </article>
         <article class="quest-step">
           <div>
             <h3>Fit PSFs</h3>
             <p>Fit one-, two-, and three-star models. Run the last cell of this notebook to meet a silly, old friend.</p>
-            <p><code>03.fitting_psfs.ipynb</code></p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="notebooks/04.fitting_psfs.pdf" target="_blank" rel="noopener">Open PDF</a>
+              <code>03.fitting_psfs.ipynb</code>
+            </p>
           </div>
         </article>
         <article class="quest-step">
           <div>
             <h3>Calibrate</h3>
             <p>Match to OGLE-III magnitudes to derive the photometry. Emerge into calibrated light.</p>
-            <p><code>04.calibrations.ipynb</code></p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="notebooks/05.calibrations.pdf" target="_blank" rel="noopener">Open PDF</a>
+              <code>04.calibrations.ipynb</code>
+            </p>
           </div>
         </article>
         <article class="quest-step">
           <div>
             <h3>Keck <span style="color: var(--mist); font-weight: 400;">(optional)</span></h3>
             <p>Handles coordinate tranformation between HST and Keck. Since this is an optional notebook, the balrog is rumored to be hidden here.</p>
-            <p><code>opt.keck_calib.ipynb</code></p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="https://github.com/10ay/MORIA/blob/main/demo/notebooks/opt.keck_calib.ipynb" target="_blank" rel="noopener">View on GitHub</a>
+              <code>opt.keck_calib.ipynb</code>
+            </p>
           </div>
         </article>
       </div>
