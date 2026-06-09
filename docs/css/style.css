@@ -38,10 +38,29 @@ body {
 }
 
 body.page-home {
-  background:
-    linear-gradient(180deg, rgba(12, 11, 10, 0.72) 0%, rgba(12, 11, 10, 0.58) 50%, rgba(12, 11, 10, 0.82) 100%),
-    url("../assets/lotr_wallpaper.webp") center / cover no-repeat fixed,
-    var(--stone-deep);
+  background: var(--stone-deep);
+}
+
+.site-wallpaper {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.site-wallpaper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 11, 10, 0.65) 0%,
+    rgba(12, 11, 10, 0.5) 50%,
+    rgba(12, 11, 10, 0.75) 100%
+  );
 }
 
 body::before {
@@ -50,7 +69,7 @@ body::before {
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
   pointer-events: none;
-  z-index: 0;
+  z-index: 1;
 }
 
 a {
@@ -116,6 +135,7 @@ img {
 
 .hero {
   position: relative;
+  z-index: 1;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -221,12 +241,14 @@ img {
   display: inline-block;
   font-size: 0.7rem;
   padding: 0.5rem 1rem;
-  margin-right: 0.75rem;
-  vertical-align: middle;
 }
 
 .notebook-links {
-  margin-top: 0.5rem !important;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 1.25rem !important;
 }
 
 .notebook-links code {
@@ -235,7 +257,6 @@ img {
   color: var(--gold);
   background: rgba(0, 0, 0, 0.3);
   padding: 0.1em 0.4em;
-  vertical-align: middle;
 }
 
 main {
@@ -382,6 +403,8 @@ main {
 }
 
 .footer {
+  position: relative;
+  z-index: 1;
   text-align: center;
   padding: 3rem 2rem;
   border-top: 1px solid rgba(201, 162, 39, 0.1);
