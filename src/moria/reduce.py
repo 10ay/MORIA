@@ -145,6 +145,22 @@ def print_uvp2tri_mcmc_acceptance_rate(directory, filter_name, fit_folders):
             string_2star = str(f"{filter_name}/{fit_folder}: MCMC acceptance rate = {rate:.4f} "f"({naccept} accepted, {nreject} rejected)")
     return string_1star, string_2star
 
+def print_uvp2tri_mcmc_acceptance_rate_3star(directory, filter_name, fit_folders):
+    """Read uvp2tri_scon_fs_asym_mcmc.log and print the MCMC acceptance rate."""
+    base_dir = Path(directory).resolve() / "06.FIT" / filter_name
+    fit_folders = ['3star-fit']
+    for fit_folder in fit_folders:
+        log_file = base_dir / fit_folder / "log_files" / "uvp2tri_scon_fs_asym_mcmc.log"
+        if not log_file.is_file():
+            print(f"{filter_name}/{fit_folder}: log file not found: {log_file}")
+            continue
+        matches = _MCMC_ACCEPTANCE_RE.findall(log_file.read_text())
+        naccept, nreject = map(int, matches[-1])
+        total = naccept + nreject
+        rate = naccept / total if total else 0.0
+        string_3star = str(f"{filter_name}/{fit_folder}: MCMC acceptance rate = {rate:.4f} "f"({naccept} accepted, {nreject} rejected)")
+    return string_3star
+
 
 def data_prep_early(destination):
     fortran_src = get_fortran_dir()
@@ -1372,6 +1388,9 @@ def tri_fit_F814W_opt(directory):
     #run_uvp2psf_simst_2(directory)
     strip_star_lines_from_uvp2tri_mcmc_814W(directory)
     run_mcmc_expand_average_814W(directory)
+    string_3star =  print_uvp2tri_mcmc_acceptance_rate_3star(directory, "F814W", fit_folders = ['3star-fit'])
+    return string_3star
+
     #run_mcmc_expand_average_606W(directory)
 
 
@@ -1564,6 +1583,9 @@ def tri_fit_F606W_opt(directory):
     run_uvp2tri_mcmc(directory, "F606W", ["3star-fit"], UVP2TRI_FSKY_OUTPUTS_F606W)
     strip_star_lines_from_uvp2tri_mcmc_606W(directory)
     run_mcmc_expand_average_606W(directory)
+    string_3star =  print_uvp2tri_mcmc_acceptance_rate_3star(directory, "F606W", fit_folders = ['3star-fit'])
+    return string_3star
+
 
 
 def calibration_input_file_one(directory):
