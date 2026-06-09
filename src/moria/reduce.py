@@ -173,6 +173,118 @@ _ACS_REFERENCE_DOWNLOADS = (
     (_ACS_STDGDC_BASE, "STDGDC_OFFICIAL_JFRAME_ACSWFC_F814W.fits", 7200.0),
 )
 
+
+UVP2TRI_FSKY_OUTPUTS_F814W = (
+    "uvp2tri_scon_fsky_I_KeckNOcon.01.pix_all",
+    "uvp2tri_scon_fsky_I_KeckNOcon.03.pix_use",
+    "uvp2tri_scon_fsky_I_KeckNOcon.04.probe_fit",
+    "uvp2tri_scon_fsky_I_KeckNOcon.05.final_fit",
+    "uvp2tri_scon_fsky_I_KeckNOcon.06.pix_show.fits",
+    "uvp2tri_scon_fsky_I_KeckNOcon.07.mcmc",
+    "uvp2tri_scon_fsky_I_KeckNOcon.08.rm_pix",
+)
+UVP2TRI_FSKY_OUTPUTS_F606W = (
+    "uvp2tri_scon_fsky_V_KeckNOcon.01.pix_all",
+    "uvp2tri_scon_fsky_V_KeckNOcon.03.pix_use",
+    "uvp2tri_scon_fsky_V_KeckNOcon.04.probe_fit",
+    "uvp2tri_scon_fsky_V_KeckNOcon.05.final_fit",
+    "uvp2tri_scon_fsky_V_KeckNOcon.06.pix_show.fits",
+    "uvp2tri_scon_fsky_V_KeckNOcon.07.mcmc",
+    "uvp2tri_scon_fsky_V_KeckNOcon.08.rm_pix",
+)
+_UVP2TRI_MCMC_SCRIPT = "run_uvp2tri_NOscon_fs_asym_mcmc.src"
+_UVP2TRI_MCMC_ALT_SCRIPT = "run_uvp2tri_NOscon_fs_asym_mcmc_alt.src"
+
+
+def uvp2tri_fsky_outputs_missing(fit_dir, output_names):
+    return [name for name in output_names if not (fit_dir / name).is_file()]
+
+
+def remove_uvp2tri_fsky_outputs(fit_dir, output_names):
+    for name in output_names:
+        (fit_dir / name).unlink(missing_ok=True)
+
+
+
+def run_uvp2tri_mcmc_csh(directory, filter_name, fit_folder, script, log_basename):
+    base_dir = Path(directory).resolve() / "06.FIT" / filter_name
+    subdir = base_dir / fit_folder
+    log_file = subdir / "log_files" / f"{log_basename}.log"
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    script_path = subdir / script
+    with open(log_file, "w") as logf:
+        subprocess.run(
+            ["csh", str(script_path)],
+            cwd=subdir,
+            stdout=logf,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+
+
+def run_uvp2tri_mcmc(directory, filter_name, fit_folders, output_names):
+    """Run uvp2tri MCMC; retry with alt script for fit folders missing expected outputs."""
+    base_dir = Path(directory).resolve() / "06.FIT" / filter_name
+    for fit_folder in fit_folders:
+        run_uvp2tri_mcmc_csh(
+            directory, filter_name, fit_folder, _UVP2TRI_MCMC_SCRIPT, "uvp2tri_scon_fs_asym_mcmc"
+        )
+    for fit_folder in fit_folders:
+        fit_dir = base_dir / fit_folder
+        if uvp2tri_fsky_outputs_missing(fit_dir, output_names):
+            remove_uvp2tri_fsky_outputs(fit_dir, output_names)
+            run_uvp2tri_mcmc_csh(
+                directory,
+                filter_name,
+                fit_folder,
+                _UVP2TRI_MCMC_ALT_SCRIPT,
+                "uvp2tri_scon_fs_asym_mcmc_alt",
+            )
+
+
+_MCMC_ACCEPTANCE_RE = re.compile(
+    r"accepted,\s*rejected\s+MCMC\s+steps:\s*(\d+)\s+(\d+)",
+    re.IGNORECASE,
+)
+
+
+
+def print_uvp2tri_mcmc_acceptance_rate(directory, filter_name, fit_folders):
+    """Read uvp2tri_scon_fs_asym_mcmc.log and print the MCMC acceptance rate."""
+    base_dir = Path(directory).resolve() / "06.FIT" / filter_name
+    fit_folders = ['1star-fit', '2star-fit']
+    for fit_folder in fit_folders:
+        log_file = base_dir / fit_folder / "log_files" / "uvp2tri_scon_fs_asym_mcmc.log"
+        if not log_file.is_file():
+            print(f"{filter_name}/{fit_folder}: log file not found: {log_file}")
+            continue
+        matches = _MCMC_ACCEPTANCE_RE.findall(log_file.read_text())
+        naccept, nreject = map(int, matches[-1])
+        total = naccept + nreject
+        rate = naccept / total if total else 0.0
+        if fit_folder == '1star-fit':
+            string_1star = str(f"{filter_name}/{fit_folder}: MCMC acceptance rate = {rate:.4f} "f"({naccept} accepted, {nreject} rejected)")
+        elif fit_folder == '2star-fit':
+            string_2star = str(f"{filter_name}/{fit_folder}: MCMC acceptance rate = {rate:.4f} "f"({naccept} accepted, {nreject} rejected)")
+    return string_1star, string_2star
+
+def print_uvp2tri_mcmc_acceptance_rate_3star(directory, filter_name, fit_folders):
+    """Read uvp2tri_scon_fs_asym_mcmc.log and print the MCMC acceptance rate."""
+    base_dir = Path(directory).resolve() / "06.FIT" / filter_name
+    fit_folders = ['3star-fit']
+    for fit_folder in fit_folders:
+        log_file = base_dir / fit_folder / "log_files" / "uvp2tri_scon_fs_asym_mcmc.log"
+        if not log_file.is_file():
+            print(f"{filter_name}/{fit_folder}: log file not found: {log_file}")
+            continue
+        matches = _MCMC_ACCEPTANCE_RE.findall(log_file.read_text())
+        naccept, nreject = map(int, matches[-1])
+        total = naccept + nreject
+        rate = naccept / total if total else 0.0
+        string_3star = str(f"{filter_name}/{fit_folder}: MCMC acceptance rate = {rate:.4f} "f"({naccept} accepted, {nreject} rejected)")
+    return string_3star
+
 def _download_url_to_path(
     url: str,
     out_path: Path,
@@ -969,7 +1081,6 @@ def cmd_rewrite_matchup_drop_xym2bar_echo(path: Path) -> None:
     pre, dat = cmd_partition_matchup_raw_lines(path)
     cmd_write_matchup_raw_lines(path, pre, dat)
 
-
 def cmd_diagram(directory):
 
 #    fortran_src = get_fortran_dir()
@@ -984,10 +1095,10 @@ def cmd_diagram(directory):
     #Establish target parameters
     response = str(input("Do you have a target? Enter 'Yes' if you do."))
     if response == 'yes' or response == 'Yes':
-        xtarg = float(input("Enter x-coord of your target"))
-        ytarg = float(input("Enter y-coord of your target"))
-        Vtarg = float(input("Enter V magnitude of your target"))
-        Itarg = float(input("Enter I magnitude of your target"))
+        xtarg = float(input("Enter x-coord of your target (from dex_no_gaia_STEP08_A.xyvieeee)"))
+        ytarg = float(input("Enter y-coord of your target (from dex_no_gaia_STEP08_A.xyvieeee)"))
+        Vtarg = float(input("Enter V magnitude of your target (from dex_no_gaia_STEP08_A.xyvieeee)"))
+        Itarg = float(input("Enter I magnitude of your target (from dex_no_gaia_STEP08_A.xyvieeee)"))
     else:
 #        pdb.set_trace()
         xtarg, ytarg = xi[0], yi[0]
@@ -1022,14 +1133,14 @@ def cmd_diagram(directory):
         #Plotting parameters 
         if response == 'yes' or response == 'Yes':
     
-            rad_max = float(input("Enter maximum plotting radius"))
-            box_max = float(input("Enter maximum box radius"))
-            mag_range = float(input("Enter magnitude range for plotting"))
-            col_range = float(input("Enter color range for plotting"))
-            ref_st_Imx = float(input("Enter reference star input I max"))
-            ref_st_Imn = float(input("Enter reference star input I min"))
-            ref_st_Vmx = float(input("Enter reference star input V max"))
-            ref_st_Vmn = float(input("Enter reference star input V min"))
+            rad_max = float(input("Enter maximum plotting radius for PSF selection (recommended: 150)"))
+            box_max = float(input("Enter maximum box radius for PSF selection (recommended: 150)"))
+            mag_range = float(input("Enter magnitude range for plotting of PSF selection (recommended: 0.60)"))
+            col_range = float(input("Enter color range for plotting of PSF selection (recommended: 0.60)"))
+            ref_st_Imx = float(input("Enter reference star input I max (recommended: F814W mag + 2)"))
+            ref_st_Imn = float(input("Enter reference star input I min (recommended: F814W mag - 2)"))
+            ref_st_Vmx = float(input("Enter reference star input V max (recommended: F606W mag + 2)"))
+            ref_st_Vmn = float(input("Enter reference star input V min (recommended: F606W mag - 2)"))
         else:
             rad_max, box_max = 300, 300
             mag_range, col_range = 0.50, 0.30
@@ -1142,12 +1253,12 @@ def cmd_diagram(directory):
         #Plotting parameters 
         if response == 'yes' or response == 'Yes':
 
-            rad_max = float(input("Enter maximum plotting radius"))
-            box_max = float(input("Enter maximum box radius"))
-            Vcalc = float(input("Enter V magnitude for calibration"))
-            Icalc = float(input("Enter I magnitude for calibration"))
-            mag_range = float(input("Enter magnitude range for plotting"))
-            col_range = float(input("Enter color range for plotting"))
+            rad_max = float(input("Enter maximum plotting radius for calibration star selection (recommended: 300)"))
+            box_max = float(input("Enter maximum box radius for calibration star selection (recommended: 300)"))
+            Vcalc = float(input("Enter F606W magnitude for calibration (recommended: -13)"))
+            Icalc = float(input("Enter I magnitude for calibration (recommended: -13)"))
+            mag_range = float(input("Enter magnitude range for plotting (recommended: 1.0)"))
+            col_range = float(input("Enter color range for plotting (recommended: 1.0)"))
         else:
             rad_max, box_max = 300, 300
             mag_range, col_range = 0.50, 0.30
@@ -1257,9 +1368,9 @@ def extract_psf_1(directory):
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W")
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W")
-    f814_images   = int(input("Enter the number of images for the F814W filter: "))
-    f606_images   = int(input("Enter the number of images for the F606W filter: "))
-    
+    sim_stars_file = Path(directory).resolve() / "02.CMD" / "NEARBY_SIM_STARS.XYIVB_targ"
+    sim_stars = np.atleast_2d(np.loadtxt(sim_stars_file, skiprows=1))
+    num_simstars = sim_stars.shape[0]
     def prepare_data(images, directory, f= 'F814W'):
         base_dir = Path(directory).resolve()
         subdir = base_dir / f
@@ -1271,8 +1382,8 @@ def extract_psf_1(directory):
                 value = 0 if i == 1 else 1
                 f.write(f"{i:2d}   {value}\n")
                 
-    prepare_data(f814_images, directory)
-    prepare_data(f606_images, directory, f = 'F606W')
+    prepare_data(num_simstars, directory)
+    prepare_data(num_simstars, directory, f = 'F606W')
     run_uvp2psf_simst(directory)
         
 def extract_psf_2(good_psf, directory):
@@ -1324,41 +1435,41 @@ def extract_psf_2(good_psf, directory):
             finally:
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
-        
+    
+    sim_stars_file = Path(directory).resolve() / "02.CMD" / "NEARBY_SIM_STARS.XYIVB_targ"
+    sim_stars = np.atleast_2d(np.loadtxt(sim_stars_file, skiprows=1))
+    num_simstars = sim_stars.shape[0]
+
     prepare_data(good_psf, directory)
     prepare_data(good_psf, directory, f='F606W')
     run_uvp2psf_simst(directory)
 
 
+
 def hst_fit_dataprep_twostar(directory, f = 'F814W'):
 
-    x1 = float(input("Initial x position for object 1"))
-    y1 = float(input("Initial y position for object 1"))
+    x1 = float(input("Initial x position for object 1 in pixels (example: -0.5)"))
+    y1 = float(input("Initial y position for object 1 in pixels (example: 0.25)"))
+    x2 = float(input("Initial x position for object 2 in pixels (example: 0.5)"))
+    y2 = float(input("Initial y position for object 2 in pixels (example: -0.17)"))
+    x3 = float(0)
+    y3 = float(0)
+    f1 = float(input("Initial flux for object 1 (example: 0.55)"))
+    f2 = float(input("Initial flux for object 2 (example: 0.45)"))
+    mcmc_dr1 = float(input("MCMC step size for object 1's position in pixels. (example: 0.01)"))
+    mcmc_dr2 = float(input("MCMC step size for object 2's position in pixels. (example: 0.01)"))
+    mcmc_dr3 = float(0)
+    mcmc_df1 = float(input("MCMC step size for flux of object 1 (example: 0.01)"))
+    mcmc_df2 = float(input("MCMC step size for flux of object 2 (example: 0.01)"))
 
-    x2 = float(input("Initial x position for object 2"))
-    y2 = float(input("Initial y position for object 2"))
- 
-    x3 = float(input("Initial x position for object 3"))
-    y3 = float(input("Initial y position for object 3"))
-
-    f1 = float(input("Initial flux for object 1"))
-    f2 = float(input("Initial flux for object 2"))
-
-    mcmc_dr1 = float(input("Maximum MCMC jump size for object 1"))
-    mcmc_dr2 = float(input("Maximum MCMC jump size for object 2"))
-    mcmc_dr3 = float(input("Maximum MCMC jump size for object 3"))
-    mcmc_df1 = float(input("Maximum MCMC jump size for flux of object 1"))
-    mcmc_df2 = float(input("Maximum MCMC jump size for flux of object 2"))
-
-    nmcmc = int(input("MCMC step sizes (Recommended: >50000)"))
-
+    nmcmc = int(input("Total MCMC steps (recommended > 50000)"))
     fudge = float(input("Input fudge factor. Input 1.0 if you don't know what this is"))
-
-    dufitmn = float(input("Minimum du cut"))
-    dufitmx = float(input("Maximum du cut"))
-    dvfitmn =float(input("Minimum dv cut"))
-    dvfitmx = float(input("Maximum dv cut"))
-    chi2cut = float(input("Chi-squared cut"))
+    dufitmn = float(input("Minimum du cut (minimum distance in x-direction) in pixels (example: -4.5)"))
+    dufitmx = float(input("Maximum du cut (maximum distance in x-direction) in pixels (example: 4.5)"))
+    dvfitmn =float(input("Minimum dv cut (minimum distance in y-direction) in pixels (example: -4.5)"))
+    dvfitmx = float(input("Maximum dv cut (maximum distance in y-direction) in pixels (example: 4.5)"))
+    chi2cut = float(input("Chi-square cut for pixel selection (example: 45)"))
+    
 
     
     if f == 'F814W':
@@ -1401,33 +1512,31 @@ def hst_fit_dataprep_twostar(directory, f = 'F814W'):
 
 def hst_fit_dataprep_threestar(directory, f = 'F814W'):
 
-    x1 = float(input("Initial x position for object 1"))
-    y1 = float(input("Initial y position for object 1"))
+    x1 = float(input("Initial x position for object 1 (example: -0.5)"))
+    y1 = float(input("Initial y position for object 1 (example: 0.01"))
 
-    x2 = float(input("Initial x position for object 2"))
-    y2 = float(input("Initial y position for object 2"))
+    x2 = float(input("Initial x position for object 2 (example: 0.4)"))
+    y2 = float(input("Initial y position for object 2 (example: -0.01)"))
  
-    x3 = float(input("Initial x position for object 3"))
-    y3 = float(input("Initial y position for object 3"))
+    x3 = float(input("Initial x position for object 3 (example: -0.001)"))
+    y3 = float(input("Initial y position for object 3 (example: 0.004)"))
 
-    f1 = float(input("Initial flux for object 1"))
-    f2 = float(input("Initial flux for object 2"))
+    f1 = float(input("Initial flux for object 1 (example: 0.2)"))
+    f2 = float(input("Initial flux for object 2 (example: 0.4)"))
 
-    mcmc_dr1 = float(input("Maximum MCMC jump size for object 1"))
-    mcmc_dr2 = float(input("Maximum MCMC jump size for object 2"))
-    mcmc_dr3 = float(input("Maximum MCMC jump size for object 3"))
-    mcmc_df1 = float(input("Maximum MCMC jump size for flux of object 1"))
-    mcmc_df2 = float(input("Maximum MCMC jump size for flux of object 2"))
+    mcmc_dr1 = float(input("MCMC step size for object 1's position in pixels. (example: 0.01)"))
+    mcmc_dr2 = float(input("MCMC step size for object 2's position in pixels. (example: 0.01)"))
+    mcmc_dr3 = float(input("MCMC step size for object 3's position in pixels. (example: 0.01)"))
+    mcmc_df1 = float(input("MCMC step size for flux of object 1 (example: 0.01)"))
+    mcmc_df2 = float(input("MCMC step size for flux of object 2 (example: 0.01)"))
 
-    nmcmc = int(input("MCMC step sizes"))
-
+    nmcmc = int(input("Total MCMC steps (recommended > 50000)"))
     fudge = float(input("Input fudge factor. Input 1.0 if you don't know what this is"))
-
-    dufitmn = float(input("Minimum du cut"))
-    dufitmx = float(input("Maximum du cut"))
-    dvfitmn =float(input("Minimum dv cut"))
-    dvfitmx = float(input("Maximum dv cut"))
-    chi2cut = float(input("Chi-squared cut"))
+    dufitmn = float(input("Minimum du cut (minimum distance in x-direction) in pixels (example: -4.5)"))
+    dufitmx = float(input("Maximum du cut (maximum distance in x-direction) in pixels (example: 4.5)"))
+    dvfitmn =float(input("Minimum dv cut (minimum distance in y-direction) in pixels (example: -4.5)"))
+    dvfitmx = float(input("Maximum dv cut (maximum distance in y-direction) in pixels (example: 4.5)"))
+    chi2cut = float(input("Chi-square cut for pixel selection (example: 45)"))
 
     
     if f == 'F814W':
@@ -1469,8 +1578,8 @@ def hst_fit_dataprep_threestar(directory, f = 'F814W'):
 
 def hst_fit_dataprep_onestar(directory, f = 'F814W'):
 
-    x1 = float(input("Initial x position for object 1"))
-    y1 = float(input("Initial y position for object 1"))
+    x1 = float(input("Initial x position for object 1 (example: 0.0)"))
+    y1 = float(input("Initial y position for object 1 (example: 0.0)"))
 
     x2 = float(0)
     y2 = float(0)
@@ -1481,21 +1590,19 @@ def hst_fit_dataprep_onestar(directory, f = 'F814W'):
     f1 = float(1)
     f2 = float(0)
 
-    mcmc_dr1 = float(input("Maximum MCMC jump size for object 1"))
+    mcmc_dr1 = float(input("MCMC step size for object 1's position in pixels. (example: 0.01)"))
     mcmc_dr2 = float(0)
     mcmc_dr3 = float(0)
-    mcmc_df1 = float(input("Maximum MCMC jump size for flux of object 1"))
+    mcmc_df1 = float(0)
     mcmc_df2 = float(0)
 
-    nmcmc = int(input("MCMC step sizes"))
-
+    nmcmc = int(input("Total MCMC steps (recommended > 50000)"))
     fudge = float(input("Input fudge factor. Input 1.0 if you don't know what this is"))
-
-    dufitmn = float(input("Minimum du cut"))
-    dufitmx = float(input("Maximum du cut"))
-    dvfitmn =float(input("Minimum dv cut"))
-    dvfitmx = float(input("Maximum dv cut"))
-    chi2cut = float(input("Chi-squared cut"))
+    dufitmn = float(input("Minimum du cut (minimum distance in x-direction) in pixels (example: -4.5)"))
+    dufitmx = float(input("Maximum du cut (maximum distance in x-direction) in pixels (example: 4.5)"))
+    dvfitmn =float(input("Minimum dv cut (minimum distance in y-direction) in pixels (example: -4.5)"))
+    dvfitmx = float(input("Maximum dv cut (maximum distance in y-direction) in pixels (example: 4.5)"))
+    chi2cut = float(input("Chi-square cut for pixel selection (example: 45)"))
 
     if f == 'F814W':
         content = [
@@ -1547,28 +1654,6 @@ def tri_fit_F814W_opt(directory):
     Local PSF for each filter
     """
 
-    def run_uvp2psf_simst_1(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
-        log_file = Path(directory).resolve() / "06.FIT" /  "F814W" / "3star-fit" / "log_files" / f"uvp2tri_scon_fs_asym_mcmc.log"
-        with open(log_file, "w") as logf:
-            try:
-                base_dir = Path(directory).resolve() / "06.FIT" /  "F814W"
-                folders = ['3star-fit']
-                for f in folders:
-                    subdir = base_dir / f
-                    script = script
-                    script_path = base_dir / f / script
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-
     def strip_star_lines_from_uvp2tri_mcmc_814W(directory):
         mcmc_path = (
             Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit" / "uvp2tri_scon_fsky_I_KeckNOcon.07.mcmc")
@@ -1600,21 +1685,14 @@ def tri_fit_F814W_opt(directory):
                 sys.stderr = sys.__stderr__
 
     _fit_3star = Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit"
-    _uvp2tri_fsky_outputs = (
-        "uvp2tri_scon_fsky_I_KeckNOcon.01.pix_all",
-        "uvp2tri_scon_fsky_I_KeckNOcon.03.pix_use",
-        "uvp2tri_scon_fsky_I_KeckNOcon.04.probe_fit",
-        "uvp2tri_scon_fsky_I_KeckNOcon.05.final_fit",
-        "uvp2tri_scon_fsky_I_KeckNOcon.06.pix_show.fits",
-        "uvp2tri_scon_fsky_I_KeckNOcon.07.mcmc",
-        "uvp2tri_scon_fsky_I_KeckNOcon.08.rm_pix",
-    )
-    for name in _uvp2tri_fsky_outputs:
+    for name in UVP2TRI_FSKY_OUTPUTS_F814W:
         (_fit_3star / name).unlink(missing_ok=True)
 
     fortran_src = get_fortran_dir()
     copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename="mcmc_expand_average.xOg")
+
     copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", filename="uvp2tri_scon_fs_asym_mcmc_alt.xOg")
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit",  extensions=[".gz"])
     copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit")
@@ -1622,35 +1700,15 @@ def tri_fit_F814W_opt(directory):
     copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "3star-fit", extensions=[".fits"])
     copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit", extensions=[".fits"])
 
-    
-    run_uvp2psf_simst_1(directory)
+    run_uvp2tri_mcmc(directory, "F814W", ["3star-fit"], UVP2TRI_FSKY_OUTPUTS_F814W)
     #run_uvp2psf_simst_2(directory)
     strip_star_lines_from_uvp2tri_mcmc_814W(directory)
     run_mcmc_expand_average_814W(directory)
+    string_3star =  print_uvp2tri_mcmc_acceptance_rate_3star(directory, "F814W", fit_folders = ['3star-fit'])
+    return string_3star
     #run_mcmc_expand_average_606W(directory)
 
-def nstar_fit_prepare(directory):
-    """
-    Fit the pixels of the target star with the PSF to determine the best-fit nstar model in the F814W filter. 
-    Parameters
-    ----------
-    directory : str or Path
-        Root directory containing 00.DATA/ and 01.XYM/ folders.
 
-    Returns
-    -------
-    Local PSF for each filter
-    """
-    fortran_src = get_fortran_dir()
-    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "nstar-fit", filename="mcmc_expand_average.xOg")
-    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F814W" / "nstar-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
-    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "nstar-fit", extensions=[".gz"])
-    copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "nstar-fit",  extensions=[".gz"])
-    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F814W" / "nstar-fit")
-    copy_files(source=Path(directory).resolve() / "02.CMD", extensions=[".XYIVB_targ"], destination=Path(directory).resolve() / "06.FIT" / "F606W" / "nstar-fit")
-    copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "nstar-fit", extensions=[".fits"])
-    copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "nstar-fit", extensions=[".fits"])
-    #run_mcmc_expand_average_606W(directory)
 
 def hst_fit_final_F814W(directory):
     """
@@ -1665,29 +1723,6 @@ def hst_fit_final_F814W(directory):
     Local PSF for each filter
     """
 
-    def run_uvp2psf_simst_1(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
-        folders = ['1star-fit', '2star-fit']
-        for f in folders:
-            log_file = Path(directory).resolve() / "06.FIT" / "F814W" / f /"log_files" / f"uvp2tri_scon_fs_asym_mcmc.log"
-            with open(log_file, "w") as logf:
-                try:
-                    base_dir = Path(directory).resolve() / "06.FIT" / "F814W"
-                    subdir = base_dir / f
-                    script = script
-                    script_path = base_dir / f / script
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
-                finally:
-                    sys.stdout = sys.__stdout__
-                    sys.stderr = sys.__stderr__
-
-        
     def strip_star_lines_from_uvp2tri_mcmc_814W(directory):
         folders = ['1star-fit', '2star-fit']
         for f in folders:
@@ -1722,16 +1757,7 @@ def hst_fit_final_F814W(directory):
     folders = ['1star-fit', '2star-fit']
     for f in folders:
         _fit_2star = Path(directory).resolve() / "06.FIT" / "F814W" / f
-        _uvp2tri_fsky_outputs = (
-            "uvp2tri_scon_fsky_I_KeckNOcon.01.pix_all",
-            "uvp2tri_scon_fsky_I_KeckNOcon.03.pix_use",
-            "uvp2tri_scon_fsky_I_KeckNOcon.04.probe_fit",
-            "uvp2tri_scon_fsky_I_KeckNOcon.05.final_fit",
-            "uvp2tri_scon_fsky_I_KeckNOcon.06.pix_show.fits",
-            "uvp2tri_scon_fsky_I_KeckNOcon.07.mcmc",
-            "uvp2tri_scon_fsky_I_KeckNOcon.08.rm_pix",
-        )
-        for name in _uvp2tri_fsky_outputs:
+        for name in UVP2TRI_FSKY_OUTPUTS_F814W:
             (_fit_2star / name).unlink(missing_ok=True)
 
     copy_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "06.FIT" / "F814W" / "1star-fit", extensions=[".gz"])
@@ -1751,10 +1777,12 @@ def hst_fit_final_F814W(directory):
     copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "1star-fit", extensions=[".fits"])
     copy_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F606W", destination=Path(directory).resolve() / "06.FIT" / "F606W" / "2star-fit", extensions=[".fits"])
 
-    
-    run_uvp2psf_simst_1(directory)
+    run_uvp2tri_mcmc(directory, "F814W", folders, UVP2TRI_FSKY_OUTPUTS_F814W)
+    #pdb.set_trace()
+    string_1star, string_2star =  print_uvp2tri_mcmc_acceptance_rate(directory, "F814W", folders)
     strip_star_lines_from_uvp2tri_mcmc_814W(directory)
     run_mcmc_expand_average_814W(directory)
+    return string_1star, string_2star
 
 
 
@@ -1771,27 +1799,6 @@ def hst_fit_final_F606W(directory):
     -------
     Local PSF for each filter
     """
-
-    def run_uvp2psf_simst_2(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
-        folders = ['1star-fit', '2star-fit']
-        for f in folders:
-            log_file = Path(directory).resolve() / "06.FIT" / "F606W" / f / "log_files" /f"uvp2tri_scon_fs_asym_mcmc.log"
-            with open(log_file, "w") as logf:
-                try:
-                    base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
-                    subdir = base_dir / f
-                    script_path = base_dir / f / script
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
-                finally:
-                    sys.stdout = sys.__stdout__
-                    sys.stderr = sys.__stderr__
 
     def strip_star_lines_from_uvp2tri_mcmc_606W(directory):
         folders = ['1star-fit', '2star-fit']
@@ -1828,22 +1835,14 @@ def hst_fit_final_F606W(directory):
     folders = ['1star-fit', '2star-fit']
     for f in folders:
         _fit_2star = Path(directory).resolve() / "06.FIT" / "F606W" / f
-        _uvp2tri_fsky_outputs = (
-            "uvp2tri_scon_fsky_V_KeckNOcon.01.pix_all",
-            "uvp2tri_scon_fsky_V_KeckNOcon.03.pix_use",
-            "uvp2tri_scon_fsky_V_KeckNOcon.04.probe_fit",
-            "uvp2tri_scon_fsky_V_KeckNOcon.05.final_fit",
-            "uvp2tri_scon_fsky_V_KeckNOcon.06.pix_show.fits",
-            "uvp2tri_scon_fsky_V_KeckNOcon.07.mcmc",
-            "uvp2tri_scon_fsky_V_KeckNOcon.08.rm_pix",
-        )
-        for name in _uvp2tri_fsky_outputs:
+        for name in UVP2TRI_FSKY_OUTPUTS_F606W:
             (_fit_2star / name).unlink(missing_ok=True)
-        
-    run_uvp2psf_simst_2(directory)
+
+    run_uvp2tri_mcmc(directory, "F606W", folders, UVP2TRI_FSKY_OUTPUTS_F606W)
+    star_1fit, star_2fit = print_uvp2tri_mcmc_acceptance_rate(directory, "F606W", folders)
     strip_star_lines_from_uvp2tri_mcmc_606W(directory)
     run_mcmc_expand_average_606W(directory)
-
+    return star_1fit, star_2fit
 
 def tri_fit_F606W_opt(directory):
     """
@@ -1857,27 +1856,6 @@ def tri_fit_F606W_opt(directory):
     -------
     Local PSF for each filter
     """
-
-    def run_uvp2psf_simst_2(directory, script='run_uvp2tri_NOscon_fs_asym_mcmc.src'):
-        log_file = Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit" / "log_files" / f"uvp2tri_scon_fs_asym_mcmc.log"
-        with open(log_file, "w") as logf:
-            try:
-                base_dir = Path(directory).resolve() / "06.FIT" / "F606W"
-                folders = ['3star-fit']
-                for f in folders:
-                    subdir = base_dir / f
-                    script_path = base_dir / f / script
-                    subprocess.run(
-                        ["csh", str(script_path)],
-                        cwd=subdir,
-                        stdout=logf,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=False
-                    )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
 
     def strip_star_lines_from_uvp2tri_mcmc_606W(directory):
         mcmc_path = (Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit" / "uvp2tri_scon_fsky_V_KeckNOcon.07.mcmc")
@@ -1909,24 +1887,56 @@ def tri_fit_F606W_opt(directory):
                 sys.stderr = sys.__stderr__
     
         
-    _fit_2star = Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit"
-    _uvp2tri_fsky_outputs = (
-        "uvp2tri_scon_fsky_V_KeckNOcon.01.pix_all",
-        "uvp2tri_scon_fsky_V_KeckNOcon.03.pix_use",
-        "uvp2tri_scon_fsky_V_KeckNOcon.04.probe_fit",
-        "uvp2tri_scon_fsky_V_KeckNOcon.05.final_fit",
-        "uvp2tri_scon_fsky_V_KeckNOcon.06.pix_show.fits",
-        "uvp2tri_scon_fsky_V_KeckNOcon.07.mcmc",
-        "uvp2tri_scon_fsky_V_KeckNOcon.08.rm_pix",
-    )
-    for name in _uvp2tri_fsky_outputs:
-        (_fit_2star / name).unlink(missing_ok=True)
-    
+    _fit_3star = Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit"
+    for name in UVP2TRI_FSKY_OUTPUTS_F606W:
+        (_fit_3star / name).unlink(missing_ok=True)
+
     fortran_src = get_fortran_dir()
     copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit", filename="uvp2tri_scon_fs_asym_mcmc.xOg")
-    run_uvp2psf_simst_2(directory)
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit", filename="uvp2tri_scon_fs_asym_mcmc_alt.xOg")
+    copy_entire_files(source=fortran_src, destination=Path(directory).resolve() / "06.FIT" / "F606W" / "3star-fit", filename="mcmc_expand_average.xOg")
+    run_uvp2tri_mcmc(directory, "F606W", ["3star-fit"], UVP2TRI_FSKY_OUTPUTS_F606W)
     strip_star_lines_from_uvp2tri_mcmc_606W(directory)
     run_mcmc_expand_average_606W(directory)
+    string_3star =  print_uvp2tri_mcmc_acceptance_rate_3star(directory, "F606W", fit_folders = ['3star-fit'])
+    return string_3star
+
+
+
+
+def notebook_complete(message: str | None = None) -> None:
+    """
+    Call at the end of a MORIA notebook when the final pipeline step is done.
+
+    Prints the Doors of Durin (ASCII art), plus an optional completion message.
+
+    Parameters
+    ----------
+    message : str, optional
+        Short note to print under the portrait (e.g. notebook name or step).
+    """
+    portrait = (Path(__file__).resolve().parent / "doors_of_durin.txt").read_text(
+        encoding="utf-8"
+    )
+    print(portrait)
+    if message:
+        print(f"  >> {message}")
+    print("  >> MORIA notebook complete. The doors are open.\n")
+
+
+
+
+def notebook_complete_fit():
+    """
+    Call at the end of fitting_psfs.ipynb when PSF fitting is done.
+
+    Prints gollum.
+    """
+    portrait = (
+        Path(__file__).resolve().parent / "gollum.txt"
+    ).read_text(encoding="utf-8")
+    print(portrait)
+    print("  >> Gollum Calls You His Precious")
 
 
 def calibration_input_file_one(directory):
