@@ -364,10 +364,11 @@ h2 .terminal-cmd .prompt {
 }
 
 .info-card {
-  background: rgba(26, 24, 20, 0.92);
+  background: var(--stone-mid);
   border: 1px solid rgba(201, 162, 39, 0.15);
   padding: 2rem;
   overflow-x: auto;
+  border-radius: 2px;
 }
 
 .pipeline-table {
@@ -375,6 +376,7 @@ h2 .terminal-cmd .prompt {
   table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.95rem;
+  background: var(--stone-mid);
 }
 
 .pipeline-table th,
@@ -384,6 +386,7 @@ h2 .terminal-cmd .prompt {
   text-align: left;
   vertical-align: middle;
   border-bottom: 1px solid rgba(201, 162, 39, 0.12);
+  background: var(--stone-mid);
 }
 
 .pipeline-table th:last-child,
