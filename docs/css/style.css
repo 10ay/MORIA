@@ -45,10 +45,19 @@ body.page-home {
   position: fixed;
   inset: 0;
   z-index: 0;
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
+  overflow: hidden;
   pointer-events: none;
+}
+
+.site-wallpaper img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 .site-wallpaper::after {
@@ -57,9 +66,9 @@ body.page-home {
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(12, 11, 10, 0.65) 0%,
-    rgba(12, 11, 10, 0.5) 50%,
-    rgba(12, 11, 10, 0.75) 100%
+    rgba(12, 11, 10, 0.72) 0%,
+    rgba(12, 11, 10, 0.58) 50%,
+    rgba(12, 11, 10, 0.78) 100%
   );
 }
 
@@ -111,6 +120,12 @@ img {
   color: var(--gold);
   text-transform: uppercase;
   text-decoration: none;
+  cursor: pointer;
+}
+
+.nav-brand:hover {
+  color: var(--gold-bright);
+  text-shadow: none;
 }
 
 .nav-links {
@@ -166,7 +181,7 @@ img {
 }
 
 .hero-logo {
-  width: min(420px, 85vw);
+  width: min(560px, 92vw);
   margin-bottom: 2rem;
   filter: drop-shadow(0 0 30px rgba(201, 162, 39, 0.25));
   position: relative;
@@ -180,9 +195,28 @@ img {
   letter-spacing: 0.4em;
   margin: 0 0 0.5rem;
   color: var(--gold-bright);
-  text-shadow: 0 0 40px var(--rune-glow);
+  text-shadow:
+    0 0 6px rgba(232, 197, 71, 0.6),
+    0 0 18px rgba(201, 162, 39, 0.45),
+    0 0 36px rgba(201, 162, 39, 0.28);
+  animation: title-glow 4s ease-in-out infinite;
   position: relative;
   z-index: 1;
+}
+
+@keyframes title-glow {
+  0%, 100% {
+    text-shadow:
+      0 0 6px rgba(232, 197, 71, 0.6),
+      0 0 18px rgba(201, 162, 39, 0.45),
+      0 0 36px rgba(201, 162, 39, 0.28);
+  }
+  50% {
+    text-shadow:
+      0 0 8px rgba(232, 197, 71, 0.75),
+      0 0 22px rgba(201, 162, 39, 0.55),
+      0 0 44px rgba(201, 162, 39, 0.35);
+  }
 }
 
 .hero-subtitle {
@@ -288,12 +322,91 @@ main {
   margin: 0 0 0.75rem;
 }
 
+h2 .terminal-cmd {
+  font-family: var(--font-mono);
+  font-size: 0.72em;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #c8e6c9;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(201, 162, 39, 0.15);
+  padding: 0.2em 0.55em;
+  border-radius: 3px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+h2 .terminal-cmd .prompt {
+  color: var(--gold-dim);
+  margin-right: 0.35em;
+  user-select: none;
+}
+
 .section-lead {
   text-align: center;
-  color: var(--mist);
-  max-width: 40rem;
+  color: #faf6ef;
+  max-width: 42rem;
   margin: 0 auto 3rem;
-  font-size: 1.05rem;
+  font-size: 1.1rem;
+  line-height: 1.75;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9), 0 0 24px rgba(0, 0, 0, 0.6);
+}
+
+.section > p {
+  color: #e4dfd6;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.optional {
+  color: var(--mist);
+  font-weight: 400;
+}
+
+.info-card {
+  background: rgba(26, 24, 20, 0.92);
+  border: 1px solid rgba(201, 162, 39, 0.15);
+  padding: 2rem;
+  overflow-x: auto;
+}
+
+.pipeline-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.pipeline-table th,
+.pipeline-table td {
+  width: 50%;
+  padding: 1rem 2rem;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.12);
+}
+
+.pipeline-table th:last-child,
+.pipeline-table td:last-child {
+  padding-left: 2.5rem;
+}
+
+.pipeline-table th {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.pipeline-table td {
+  color: #e4dfd6;
+}
+
+.pipeline-table code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--gold);
 }
 
 .quest-path {
@@ -308,7 +421,7 @@ main {
   gap: 1.25rem;
   align-items: start;
   padding: 1.5rem;
-  background: var(--stone-mid);
+  background: rgba(26, 24, 20, 0.92);
   border: 1px solid rgba(201, 162, 39, 0.12);
   border-left: 3px solid var(--gold-dim);
   transition: border-color 0.25s, box-shadow 0.25s;
@@ -340,8 +453,8 @@ main {
 }
 
 .quest-step p {
-  margin: 0;
-  color: #b8b2a8;
+  margin: 0 0 0.5rem;
+  color: #d8d2c8;
   font-size: 1rem;
 }
 
@@ -354,9 +467,15 @@ main {
 }
 
 .install-card {
-  background: var(--stone-mid);
+  background: rgba(26, 24, 20, 0.92);
   border: 1px solid rgba(201, 162, 39, 0.15);
   padding: 2rem;
+}
+
+.install-card p,
+.install-card strong {
+  color: #e4dfd6;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .install-card pre {
