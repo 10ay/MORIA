@@ -1814,6 +1814,39 @@ def calibration_hst_ogle_match(directory):
     VI_HST_ogle_man_match4(directory)
     
 
+def fix_vi_hst_ogle_cal_matches4_spacing(directory):
+    """
+    VI_HST_ogle_man_match4 writes Vo-Vhfs (f9.4) and lg_c2Vmx (f8.3) adjacent.
+    Insert the missing space so fit_HST_IV_ogle_col can parse the file.
+    """
+    file_path = Path(directory).resolve() / "07.CALIBRATION" / "VI_HST_ogle_Cal_matches4.dat"
+    if not file_path.exists():
+        return
+
+    # f9.4 field ending in four decimals, immediately followed by a negative f8.3.
+    boundary = re.compile(r"\.\d{4}-")
+    out_lines = []
+    for line in file_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("#"):
+            out_lines.append(line)
+            continue
+        if len(line.split()) >= 23:
+            out_lines.append(line)
+            continue
+        matches = list(boundary.finditer(line))
+        if len(matches) >= 2:
+            idx = matches[1].end() - 1
+        elif matches:
+            idx = matches[0].end() - 1
+        else:
+            out_lines.append(line)
+            continue
+        line = line[:idx] + " " + line[idx:]
+        out_lines.append(line)
+
+    file_path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+
+
 def fit_calibration(directory):
     """
     The goal here is to calibrate the HST photometry to the OGLE-III database.
@@ -1856,6 +1889,7 @@ def fit_calibration(directory):
         print(f"Finished fitting calibration")
         return
 
+    fix_vi_hst_ogle_cal_matches4_spacing(directory)
     fit_HST_IV_ogle_col_1(directory)
 
 def get_chip_number(ogle_ra_deg, ogle_dec_deg):
@@ -1880,14 +1914,7 @@ def get_chip_number(ogle_ra_deg, ogle_dec_deg):
 
 
 
-def ogle_map_and_reference_filenames(
-    ogle_field_number: int,
-    ogle_chip_number: int,
-    ogle_band: str = "I",
-    *,
-    map_prefix_case: str = "upper",
-    ref_prefix_case: str = "lower",
-):
+def ogle_map_and_reference_filenames(ogle_field_number, ogle_chip_number, ogle_band="I", *, map_prefix_case="upper", ref_prefix_case="lower"):
     """
     Construct the OGLE-III blg filenames from a field + chip identifier.
 
@@ -1918,19 +1945,10 @@ def ogle_map_and_reference_filenames(
     }
 
 
-def download_ogle_map_and_reference(
-    directory: str | Path,
-    ogle_field_number: int,
-    ogle_chip_number: int,
-    ogle_band: str = "I",
-    destination_subdir: str = "07.CALIBRATION",
-    overwrite: bool = False,
-    map_prefix_case: str = "upper",
-    ref_prefix_case: str = "lower",
-    maps_base_url: str = "http://www.astrouw.edu.pl/ogle/ogle3/maps/blg/maps/",
-    ref_images_base_url: str = "http://www.astrouw.edu.pl/ogle/ogle3/maps/blg/ref_images/",
-    timeout_s: float = 120.0,
-):
+def download_ogle_map_and_reference(directory, ogle_field_number, ogle_chip_number, ogle_band="I", 
+                                    destination_subdir="07.CALIBRATION", overwrite=False, map_prefix_case="upper", ref_prefix_case="lower", 
+                                    maps_base_url="http://www.astrouw.edu.pl/ogle/ogle3/maps/blg/maps/", ref_images_base_url="http://www.astrouw.edu.pl/ogle/ogle3/maps/blg/ref_images/", timeout_s=120.0):
+                                        
     """
     Download the OGLE-III photometry map and reference image needed for calibration.
 
@@ -2002,23 +2020,27 @@ def download_ogle_map_and_reference(
     used_map_url = try_download_candidates(map_candidates, map_path)
     used_ref_url = try_download_candidates(ref_candidates, ref_path)
 
+    subset_map_path = dest_dir / f"New_{fn['map_filename_local']}"
+    columns = ["ogle_x", "ogle_y", "V", "I"]
+    df = pd.read_csv( map_path, header=None, sep=r"\s+", usecols=[3, 4, 5, 7], names=columns)
+    with open(subset_map_path, "w", encoding="utf-8") as f:
+        f.write("ogle_x ogle_y V I\n")
+        for row in df.itertuples(index=False):
+            f.write(
+                f"{row.ogle_x:7.2f} {row.ogle_y:7.2f} {row.V:6.3f} {row.I:6.3f}\n"
+            )
+
     return {
         "map_url": used_map_url,
         "ref_url": used_ref_url,
         "map_path": str(map_path),
+        "subset_map_path": str(subset_map_path),
         "ref_path": str(ref_path),
     }
 
 
-def ogle_field_chip_candidates_from_coords(
-    ra_deg: float,
-    dec_deg: float,
-    phase: str | int = 3,
-    epoch: str | float = 2000.0,
-    assume_ra_is_hours_if_lt_24: bool = True,
-    base_url: str = "https://ogle.astrouw.edu.pl/cgi-ogle/uncgi.cgi/radec2field",
-    timeout_s: float = 30.0,
-) -> list[dict]:
+def ogle_field_chip_candidates_from_coords(ra_deg, dec_deg, phase=3, epoch=2000.0, assume_ra_is_hours_if_lt_24=True, 
+                                        base_url="https://ogle.astrouw.edu.pl/cgi-ogle/uncgi.cgi/radec2field", timeout_s=30.0):
     """
     Query the OGLE Field Finder to get candidate OGLE-III fields + chip numbers.
 
@@ -2104,10 +2126,13 @@ def ogle_field_chip_candidates_from_coords(
     if not candidates:
         raise ValueError(f"No OGLE field candidates found for ra_deg={ra_deg}, dec_deg={dec_deg}.")
 
+    
+
+
     return candidates
 
 
-def notebook_complete(message: str | None = None) -> None:
+def notebook_complete(message):
     """
     Call at the end of a MORIA notebook when the final pipeline step is done.
 
