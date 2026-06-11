@@ -65,7 +65,7 @@ This following scientific publication should be acknowledged by a citation to th
 
 The Zenodo Citation for this package is:
 
-[![Zenodo DOI: 10.5281/zenodo.20648200]](https://doi.org/10.5281/zenodo.20648200)
+[Zenodo DOI: 10.5281/zenodo.20648200](https://doi.org/10.5281/zenodo.20648200)
 
 
 ![Logo](https://github.com/10ay/MORIA/blob/main/new_logo.png)
