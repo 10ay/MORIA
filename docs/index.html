@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MORIA — Microlensing Object high-Resolution Imaging Analysis.">
+  <title>MORIA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=3">
+</head>
+<body class="page-home">
+  <div class="site-wallpaper" aria-hidden="true">
+    <img src="assets/lotr_wallpaper.webp?v=2" alt="">
+  </div>
+
+  <nav class="nav">
+    <a href="#top" class="nav-brand">MORIA</a>
+    <ul class="nav-links">
+      <li><a href="#deep">About MORIA</a></li>
+      <li><a href="#fellowship">Join the Fellowship </a></li>
+      <li><a href="#scrolls">Speak, Friend, And cd</a></li>
+      <li><a href="#pipeline">The Mines</a></li>
+    </ul>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <img class="hero-logo" src="assets/logo.png" alt="MORIA logo">
+    <h1>MORIA</h1>
+    <p class="hero-subtitle">Microlensing Object high-Resolution Imaging Analysis</p>
+    <p class="hero-tagline">
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="#fellowship">Enter the Mines</a>
+      <a class="btn" href="https://github.com/10ay/MORIA" target="_blank" rel="noopener">View on GitHub</a>
+    </div>
+  </header>
+
+  <main>
+
+    <section class="section" id="deep">
+      <div class="section-divider"></div>
+      <h2>About MORIA</h2>
+      <p class="section-lead">
+        There are Lord of the Rings references throughout this website and pipeline. The author of this pipeline (me) is a big fan and apologizes for the references.
+      </p>
+      <p>
+        MORIA is an automated procedure to reduce high-resolution HST images of microlensing targets,
+        build empirical point-spread function models from the data, and perform simultaneous multi-star PSF fitting to blended sources,
+        lenses, and neighbor stars.
+      </p>
+      <p>
+        A paper on the use of MORIA with KMT-2019-BLG-0253 is available here and is titled:
+        <a href="https://arxiv.org/abs/2605.08340?context=astro-ph.EP" target="_blank" rel="noopener">
+          <em>You Shall Not Pass (Without Modeling): High-Resolution Analysis of KMT-2019-BLG-0253 using MORIA</em>
+        </a>
+      </p>
+    </section>
+
+    <section class="section" id="fellowship">
+      <div class="section-divider"></div>
+      <h2>Join the Fellowship</h2>
+      <p class="section-lead">
+        Clone the repository, install the package, and copy the demo notebooks to your working directory.
+      </p>
+      <div class="install-card">
+        <p><strong>Clone and Install By:</strong></p>
+        <pre>git clone https://github.com/10ay/MORIA.git
+cd MORIA
+pip install -e .</pre>
+        <p><strong>Copy notebooks to your analysis directory:</strong></p>
+        <pre>cp -r demo/notebooks/* /path/to/your/project/
+cp -r data/* /path/to/your/project/</pre>
+        <p><strong>Along with you, here are the other eight members of the Fellowship</strong></p>
+        <ul class="deps-list">
+          <li>matplotlib</li>
+          <li>pandas</li>
+          <li>pathlib</li>
+          <li>astropy</li>
+          <li>numpy</li>
+          <li>Plotly</li>
+          <li>Fortran Compiler</li>
+          <li>Jupyter</li>
+        </ul>
+        <p><strong>Nine companions. So be it. You shall be the fellowship of the ring.</strong></p>
+      </div>
+    </section>
+
+    <section class="section" id="scrolls">
+      <div class="section-divider"></div>
+      <h2>Speak, Friend, And <code class="terminal-cmd"> cd</code></h2>
+      <p class="section-lead">
+        The recommended way to run MORIA is to copy everything in demo/notebook to the same repository level at which you want to perform the data analysis.
+        If you follow the installation instructions above, you should alreay be ready to run the pipeline. 
+        Follow the demo notebooks in this order. 
+      </p>
+      <div class="quest-path">
+        <article class="quest-step">
+          <div>
+            <h3>Output Stacks</h3>
+            <p>Prepare and stack HST images. Build a starlist from the images.</p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="notebooks/00.output_stack.pdf" target="_blank" rel="noopener">Open PDF</a>
+              <code>00.output_stacks.ipynb</code>
+            </p>
+          </div>
+        </article>
+        <article class="quest-step">
+          <div>
+            <h3>CMD Diagram</h3>
+            <p>Make a CMD diagram + identify stars with colors and magnitudes similar to the target.</p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="notebooks/01.cmd_diagram.pdf" target="_blank" rel="noopener">Open PDF</a>
+              <code>01.cmd_diagram.ipynb</code>
+            </p>
+          </div>
+        </article>
+        <article class="quest-step">
+          <div>
+            <h3>Create a PSF</h3>
+            <p>Construct a PSF model using stars selected to have colors and magnitudes similar to those of the target star. </p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="notebooks/02.creating_psf.pdf" target="_blank" rel="noopener">Open PDF</a>
+              <code>02.creating_psf.ipynb</code>
+            </p>
+          </div>
+        </article>
+        <article class="quest-step">
+          <div>
+            <h3>Fit PSFs</h3>
+            <p>Fit one-, two-, and three-star models. Run the last cell of this notebook to meet a silly, old friend.</p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="notebooks/04.fitting_psfs.pdf" target="_blank" rel="noopener">Open PDF</a>
+              <code>03.fitting_psfs.ipynb</code>
+            </p>
+          </div>
+        </article>
+        <article class="quest-step">
+          <div>
+            <h3>Calibrate</h3>
+            <p>Match to OGLE-III magnitudes to derive the photometry. Emerge into calibrated light.</p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="notebooks/05.calibrations.pdf" target="_blank" rel="noopener">Open PDF</a>
+              <code>04.calibrations.ipynb</code>
+            </p>
+          </div>
+        </article>
+        <article class="quest-step">
+          <div>
+            <h3>Keck <span style="color: var(--mist); font-weight: 400;">(optional)</span></h3>
+            <p>Handles coordinate tranformation between HST and Keck. Since this is an optional notebook, the Balrog is rumored to be hidden here.</p>
+            <p class="notebook-links">
+              <a class="btn btn-sm" href="https://github.com/10ay/MORIA/blob/main/demo/notebooks/opt.keck_calib.ipynb" target="_blank" rel="noopener">View on GitHub</a>
+              <code>opt.keck_calib.ipynb</code>
+            </p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="pipeline">
+      <div class="section-divider"></div>
+      <h2>The Mines</h2>
+      <p class="section-lead">
+        MORIA expects a project directory with numbered data folders. The necessary scripts required to run the pipeline live in the
+        <a href="https://github.com/10ay/MORIA/tree/main/data" target="_blank" rel="noopener">data/</a> folder. Your working directory should include these folders.
+      </p>
+      <div class="info-card">
+        <table class="pipeline-table">
+          <thead>
+            <tr><th>Folder</th><th>Notebook</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>00.DATA</code></td><td><code>00.output_stacks.ipynb</code></td></tr>
+            <tr><td><code>01.XYM</code></td><td><code>00.output_stacks.ipynb</code></td></tr>
+            <tr><td><code>02.CMD</code></td><td><code>01.cmd_diagram.ipynb</code></td></tr>
+            <tr><td><code>03.LOC_TRANS</code></td><td><code>02.creating_psf.ipynb</code></td></tr>
+            <tr><td><code>04.EXTRACT_PSF</code></td><td><code>02.creating_psf.ipynb</code></td></tr>
+            <tr><td><code>05.KECK_TRANS</code></td><td><code>opt.keck_calib.ipynb</code></td></tr>
+            <tr><td><code>06.FIT</code></td><td><code>03.fitting_psfs.ipynb</code></td></tr>
+            <tr><td><code>07.CALIBRATION</code></td><td><code>04.calibrations.ipynb</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="citation">
+      <em>You Shall Not Pass (Without Modeling): High-Resolution Analysis of KMT-2019-BLG-0253 using MORIA</em>
+      <p>
+        Bhadra, T. D. et al. —
+        <a href="https://arxiv.org/abs/2605.08340" target="_blank" rel="noopener">arXiv:2605.08340</a>
+      </p>
+    </div>
+
+  </main>
+
+  <footer class="footer">
+    <p class="footer-rune">᚛ MORIA ᚜</p>
+  </footer>
+
+</body>
+</html>

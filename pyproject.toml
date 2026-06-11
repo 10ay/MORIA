@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://example.com/moria"
+Homepage = "https://10ay.github.io/MORIA/"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
