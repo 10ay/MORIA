@@ -56,5 +56,11 @@ This following scientific publication should be acknowledged by a citation to th
 
 [Bhadra, T. D. et al. “You Shall Not Pass (Without Modeling): High-Resolution Analysis of KMT-2019-BLG-0253 using MORIA.”](https://arxiv.org/abs/2605.08340)
 
-
+    @article{bhadra2026you,
+            title={You Shall Not Pass (Without Modeling): High-Resolution Analysis of KMT-2019-BLG-0253 using MORIA},
+            author={Bhadra, T and Terry, Sean K and Bennett, David P and Bhattacharya, Aparna and Bond, Ian A and Hulberg, Jon and Silva, Stela Ishitani and Mr{\u{A}}{\l}z, Przemek and Vandorou, Aikaterini},
+            journal={arXiv preprint arXiv:2605.08340},
+            year={2026}
+            }
+        
 ![Logo](https://github.com/10ay/MORIA/blob/main/new_logo.png)
