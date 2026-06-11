@@ -62,5 +62,10 @@ This following scientific publication should be acknowledged by a citation to th
             journal={arXiv preprint arXiv:2605.08340},
             year={2026}
             }
-        
+
+The Zenodo Citation for this package is:
+
+    [![DOI](https://zenodo.org)](10.5281/zenodo.20648200)
+
+
 ![Logo](https://github.com/10ay/MORIA/blob/main/new_logo.png)
