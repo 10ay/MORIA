@@ -375,6 +375,7 @@ def data_prep_early(camera, destination):
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F814W", extensions=[".xOg"])
     copy_files(source=fortran_src, destination=Path(destination).resolve() / "00.DATA" / "F606W", extensions=[".xOg"])
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="dex_no_gaia.e")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="1exp_no_gaia.e")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="hst1pass.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="hst1pass.F")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS", filename="img2extract_wfc3uv_psflist.xOg")
@@ -669,6 +670,41 @@ def matchup_files(camera,directory):
                 check=False,
                 env=os.environ,
             )
+    def reduce_wfc3_1exp(directory, script='reduce_wfc3_1exp.src'):
+        """
+        Run hst1pass on exposures in the F814W and F606W filters.
+        """
+        log_file = Path(directory).resolve() / "01.XYM" / "log_files" / "reduce_wfc3_1exp.log"
+        base_dir = Path(directory).resolve() / "01.XYM"
+        script_path = base_dir / script
+        with open(log_file, "w") as logf:
+            subprocess.run(
+                ["bash", str(script_path)],
+                cwd=base_dir,
+                stdout=logf,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+                env=os.environ,
+            )
+
+    def reduce_acs_1exp(directory, script='reduce_acs_1exp.src'):
+        """
+        Run hst1pass on exposures in the F814W and F606W filters.
+        """
+        log_file = Path(directory).resolve() / "01.XYM" / "log_files" / "reduce_acs_1exp.log"
+        base_dir = Path(directory).resolve() / "01.XYM"
+        script_path = base_dir / script
+        with open(log_file, "w") as logf:
+            subprocess.run(
+                ["bash", str(script_path)],
+                cwd=base_dir,
+                stdout=logf,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+                env=os.environ,
+            )
 
     def no_gaia_matchup(directory, script='no_gaia_match.src'):
         """
@@ -716,16 +752,70 @@ def matchup_files(camera,directory):
                 env=os.environ,
             )
 
-    if camera == "WFC3UV":
-        reduce_wfc3(directory)
-    elif camera == "ACS":
-        reduce_acs(directory)
+    def no_gaia_matchup_1exp(directory, script='1exp_no_gaia_match.src'):
+        """
+        Write ``no_gaia_match.src`` and run ``dex_no_gaia.e`` on the four hst1pass lists
+        produced by ``reduce_wfc3`` (two ``*.F606W_xympquvwrd``, two ``*.F814W_xympquvwrd``
+        in ``01.XYM``).
+        """
+        base_dir = Path(directory).resolve() / "01.XYM"
+        log_dir = base_dir / "log_files"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "matchup.log"
+
+        f606 = sorted(base_dir.glob("*.F606W_xympquvwrd"))
+        f814 = sorted(base_dir.glob("*.F814W_xympquvwrd"))
+        names606 = [p.name for p in f606]
+        names814 = [p.name for p in f814]
+        field_root = Path(directory).resolve()
+        ref_candidates = [
+            (base_dir / "NEARBY_REF_STARS.XYIVB_targ", "NEARBY_REF_STARS.XYIVB_targ"),
+            (base_dir / "NEARBY_SIM_STARS.XYIVB_targ", "NEARBY_SIM_STARS.XYIVB_targ"),
+            (field_root / "02.CMD" / "NEARBY_REF_STARS.XYIVB_targ", "../02.CMD/NEARBY_REF_STARS.XYIVB_targ"),
+            (field_root / "02.CMD" / "NEARBY_SIM_STARS.XYIVB_targ", "../02.CMD/NEARBY_SIM_STARS.XYIVB_targ"),
+        ]
+        ref_prefix = ""
+        for path, argv_token in ref_candidates:
+            if path.is_file():
+                ref_prefix = argv_token + " "
+                break
+        line = "./1exp_no_gaia.e " + ref_prefix + " ".join(names606 + names814) + "\n"
+        script_path = base_dir / script
+        script_path.write_text(line, encoding="utf-8")
+
+        with open(log_file, "w") as logf:
+            subprocess.run(
+                ["bash", str(script_path)],
+                cwd=base_dir,
+                stdout=logf,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+                env=os.environ,
+            )
+
+    
+    base_dir = Path(directory).resolve() / "01.XYM"
+    f606 = sorted(base_dir.glob("*.F606W_xympquvwrd"))
+    if len(f606) == 1:
+        no_gaia_matchup_1exp(directory)
+        if camera == "WFC3UV":
+            reduce_wfc3_1exp(directory)
+        elif camera == "ACS":
+            reduce_acs_1exp(directory)
+        else:
+            raise ValueError(f"Invalid camera: {camera}")
+
     else:
-        raise ValueError(f"Invalid camera: {camera}")
+        if camera == "WFC3UV":
+            reduce_wfc3_1exp(directory)
+        elif camera == "ACS":
+            reduce_acs(directory)
+        else:
+            raise ValueError(f"Invalid camera: {camera}")
 
-    no_gaia_matchup(directory)
+        no_gaia_matchup(directory)
    
-
 def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
     """
     Create a stack of the scene in the reference frame.

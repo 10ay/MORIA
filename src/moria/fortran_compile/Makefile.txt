@@ -4,12 +4,15 @@ F77 = gfortran-mp-14
 OPT = -g
 
 # Build everything: all *.xOg plus selected *.e tools
-SRCS_XOG = $(filter-out dex_no_gaia.F xym2mat_new.F,$(sort $(wildcard *.F) $(wildcard *.f)))
+SRCS_XOG = $(filter-out dex_no_gaia.F 1exp_no_gaia.F xym2mat_new.F,$(sort $(wildcard *.F) $(wildcard *.f)))
 EXECUTABLES_XOG = $(addsuffix .xOg,$(basename $(SRCS_XOG)))
 
-all: $(EXECUTABLES_XOG) dex_no_gaia.e xym2mat_new.e
+all: $(EXECUTABLES_XOG) dex_no_gaia.e 1exp_no_gaia.e xym2mat_new.e
 
 dex_no_gaia.e: dex_no_gaia.F
+	$(F77) $(OPT) $< -o $@
+
+1exp_no_gaia.e: 1exp_no_gaia.F
 	$(F77) $(OPT) $< -o $@
 
 xym2mat_new.e: xym2mat_new.F
@@ -25,7 +28,8 @@ xogs: $(EXECUTABLES_XOG)
 
 # Convenience targets
 dex: dex_no_gaia.e
+oneexp: 1exp_no_gaia.e
 xym2mat_new: xym2mat_new.e
 
 clean:
-	rm -f dex_no_gaia.e xym2mat_new.e $(EXECUTABLES_XOG)
+	rm -f dex_no_gaia.e 1exp_no_gaia.e xym2mat_new.e $(EXECUTABLES_XOG)
