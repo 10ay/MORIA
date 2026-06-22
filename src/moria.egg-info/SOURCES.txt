@@ -11,6 +11,9 @@ src/moria.egg-info/dependency_links.txt
 src/moria.egg-info/entry_points.txt
 src/moria.egg-info/requires.txt
 src/moria.egg-info/top_level.txt
+src/moria/fortran_compile/1exp_no_gaia.F
+src/moria/fortran_compile/1exp_xym2mat_new.F
+src/moria/fortran_compile/1exp_xym2mat_new.e
 src/moria/fortran_compile/HST_Keck_coord_trans.F
 src/moria/fortran_compile/Makefile.txt
 src/moria/fortran_compile/VI_HST_ogle_man_match4.F

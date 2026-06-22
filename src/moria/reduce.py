@@ -380,6 +380,7 @@ def data_prep_early(camera, destination):
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "01.XYM", filename="hst1pass.F")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS", filename="img2extract_wfc3uv_psflist.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS", filename="xym2mat_new.e")
+    copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS", filename="1exp_xym2mat_new.e")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "03.LOC_TRANS", filename="img2extract_wfc3uv_psflist.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F814W", filename="uvp2psf_simst.xOg")
     copy_entire_files(source=fortran_src, destination=Path(destination).resolve() / "04.EXTRACT_PSF" / "F606W", filename="uvp2psf_simstV.xOg")
@@ -629,6 +630,25 @@ def _write_xym2bar_run_scripts(field_root: Path) -> None:
         # Keep "I" so xym2bar reads the NIM=0 input list from IN.xym2bar.
         (fdir_V / "run_xym2bar.src").write_text(f"./xym2bar.xOg {nim_V} I DMATCH=8\ncp -p MATCHUP.XYMEEE MATCHUP.F606W.XYM\n", encoding="utf-8")
 
+
+def _f606_flc_count(directory) -> int:
+    """Number of F606W *_flc.fits exposures in 00.DATA."""
+    data_dir = Path(directory).resolve() / "00.DATA" / "F606W"
+    return len(list(data_dir.glob("*_flc.fits")))
+
+
+def _hstpass_catalog_counts(directory):
+    """Return sorted F606W and F814W hst1pass list paths under 01.XYM."""
+    base_dir = Path(directory).resolve() / "01.XYM"
+    f606 = sorted(base_dir.glob("*.F606W_xympquvwrd"))
+    f814 = sorted(base_dir.glob("*.F814W_xympquvwrd"))
+    return f606, f814
+
+
+def _use_single_f606w_mode(directory) -> bool:
+    """True when the field has one F606W exposure (1 F606W + 2 F814W)."""
+    return _f606_flc_count(directory) == 1
+
     
 def matchup_files(camera,directory):
     """
@@ -754,17 +774,20 @@ def matchup_files(camera,directory):
 
     def no_gaia_matchup_1exp(directory, script='1exp_no_gaia_match.src'):
         """
-        Write ``no_gaia_match.src`` and run ``dex_no_gaia.e`` on the four hst1pass lists
-        produced by ``reduce_wfc3`` (two ``*.F606W_xympquvwrd``, two ``*.F814W_xympquvwrd``
-        in ``01.XYM``).
+        Write ``1exp_no_gaia_match.src`` and run ``1exp_no_gaia.e`` on one
+        ``*.F606W_xympquvwrd`` and two ``*.F814W_xympquvwrd`` files in ``01.XYM``.
         """
         base_dir = Path(directory).resolve() / "01.XYM"
         log_dir = base_dir / "log_files"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "matchup.log"
 
-        f606 = sorted(base_dir.glob("*.F606W_xympquvwrd"))
-        f814 = sorted(base_dir.glob("*.F814W_xympquvwrd"))
+        f606, f814 = _hstpass_catalog_counts(directory)
+        if len(f606) != 1 or len(f814) != 2:
+            raise ValueError(
+                "Need exactly 1 '*.F606W_xympquvwrd' and 2 '*.F814W_xympquvwrd' "
+                f"in {base_dir}, found F606W={len(f606)} F814W={len(f814)}"
+            )
         names606 = [p.name for p in f606]
         names814 = [p.name for p in f814]
         field_root = Path(directory).resolve()
@@ -794,28 +817,21 @@ def matchup_files(camera,directory):
                 env=os.environ,
             )
 
-    
-    base_dir = Path(directory).resolve() / "01.XYM"
-    f606 = sorted(base_dir.glob("*.F606W_xympquvwrd"))
-    if len(f606) == 1:
-        no_gaia_matchup_1exp(directory)
-        if camera == "WFC3UV":
-            reduce_wfc3_1exp(directory)
-        elif camera == "ACS":
-            reduce_acs_1exp(directory)
-        else:
-            raise ValueError(f"Invalid camera: {camera}")
+    use_1exp = _use_single_f606w_mode(directory)
 
+    if camera == "WFC3UV":
+        reduce_fn = reduce_wfc3_1exp if use_1exp else reduce_wfc3
+    elif camera == "ACS":
+        reduce_fn = reduce_acs_1exp if use_1exp else reduce_acs
     else:
-        if camera == "WFC3UV":
-            reduce_wfc3_1exp(directory)
-        elif camera == "ACS":
-            reduce_acs(directory)
-        else:
-            raise ValueError(f"Invalid camera: {camera}")
+        raise ValueError(f"Invalid camera: {camera}")
 
+    reduce_fn(directory)
+    if use_1exp:
+        no_gaia_matchup_1exp(directory)
+    else:
         no_gaia_matchup(directory)
-   
+
 def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
     """
     Create a stack of the scene in the reference frame.
@@ -842,12 +858,17 @@ def run_output_stack(directory, script='run_img2sam_wfc3uv_379.src'):
                 sys.stderr = sys.__stderr__
 
 
-def write_run_xym2mat_src_loc_trans(output_path: Path, xym_dir: Path) -> None:
+def write_run_xym2mat_src_loc_trans(
+    output_path: Path,
+    xym_dir: Path,
+    *,
+    use_1exp: bool | None = None,
+) -> None:
     """
-    Write ``run_xym2mat.src`` for LOC_TRANS: a single line invoking
-    ``./xym2mat_new.e`` with two ``*F606W*xympquvwrd`` files then two
-    ``*F814W*xympquvwrd`` files (sorted within each filter), matching
-    ``xym2mat_new.F`` command-line parsing.
+    Write ``run_xym2mat.src`` for LOC_TRANS.
+
+    Invokes ``xym2mat_new.e`` (2 F606W + 2 F814W) or ``1exp_xym2mat_new.e``
+    (1 F606W + 2 F814W) with catalog filenames sorted within each filter.
     """
     f606 = sorted(
         p.name
@@ -859,15 +880,27 @@ def write_run_xym2mat_src_loc_trans(output_path: Path, xym_dir: Path) -> None:
         for p in xym_dir.iterdir()
         if p.is_file() and p.name.endswith(".F814W_xympquvwrd")
     )
-    if len(f606) != 2 or len(f814) != 2:
-        raise FileNotFoundError(
-            "write_run_xym2mat_src_loc_trans: need exactly two "
-            "*.F606W_xympquvwrd and two *.F814W_xympquvwrd under "
-            f"{xym_dir}, found F606W={len(f606)} F814W={len(f814)}"
-        )
+    if use_1exp is None:
+        use_1exp = len(f606) == 1
+    if use_1exp:
+        if len(f606) != 1 or len(f814) != 2:
+            raise FileNotFoundError(
+                "write_run_xym2mat_src_loc_trans: need 1 *.F606W_xympquvwrd and "
+                f"2 *.F814W_xympquvwrd under {xym_dir}, found "
+                f"F606W={len(f606)} F814W={len(f814)}"
+            )
+        executable = "./1exp_xym2mat_new.e"
+    else:
+        if len(f606) != 2 or len(f814) != 2:
+            raise FileNotFoundError(
+                "write_run_xym2mat_src_loc_trans: need 2 *.F606W_xympquvwrd and "
+                f"2 *.F814W_xympquvwrd under {xym_dir}, found "
+                f"F606W={len(f606)} F814W={len(f814)}"
+            )
+        executable = "./xym2mat_new.e"
     files = f606 + f814
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    line = "./xym2mat_new.e " + " ".join(files) + "\n"
+    line = executable + " " + " ".join(files) + "\n"
     with open(output_path, "w", encoding="utf-8") as fh:
         fh.write(line)
 
@@ -878,8 +911,10 @@ def write_in_img2sam_wfc3uv_loc_trans(
     data_dir: Path,
 ) -> None:
     """
-    Write ``IN.img2sam_wfc3uv`` for LOC_TRANS using the two ``F814W`` WJC files
-    first, followed by the two ``F606W`` WJC files from ``00.DATA``.
+    Write ``IN.img2sam_wfc3uv`` for LOC_TRANS.
+
+    Lists all F814W WJC/WJ2 files first, then all F606W files from ``00.DATA``.
+    Supports one or two exposures per filter.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as fh:
@@ -898,10 +933,9 @@ def write_in_img2sam_wfc3uv_loc_trans(
                     for p in fits_dir.iterdir()
                     if p.is_file() and p.name.endswith("_WJ2.fits")
                 )
-            if len(names) != 2:
+            if not names:
                 raise FileNotFoundError(
-                    f"write_in_img2sam_wfc3uv_loc_trans: need exactly two *_WJC.fits "
-                    f"under {fits_dir}, found {len(names)}"
+                    f"write_in_img2sam_wfc3uv_loc_trans: no WJC/WJ2 files under {fits_dir}"
                 )
             for filename in names:
                 fh.write(f'{idx:02d} "{filename}" {chip} 0\n')
@@ -911,8 +945,10 @@ def write_in_img2sam_wfc3uv_loc_trans(
 def data_prep_loc_trans(camera,directory, filters = 'F814W'):
     """
     Prepare LOC_TRANS inputs: copy star lists and FITS into ``03.LOC_TRANS``,
-    write ``IN.img2sam_wfc3uv``, and write ``run_xym2mat.src`` (``xym2mat_new.e``
-    with four catalog filenames: F606W×2 then F814W×2).
+    write ``IN.img2sam_wfc3uv``, and write ``run_xym2mat.src``.
+
+    Uses ``1exp_xym2mat_new.e`` when only one F606W catalog is present
+    (1 F606W + 2 F814W); otherwise ``xym2mat_new.e`` (2+2).
 
     Parameters
     ----------
@@ -937,11 +973,15 @@ def data_prep_loc_trans(camera,directory, filters = 'F814W'):
     in_img2sam_wfc3uv = 'IN.img2sam_wfc3uv'
 
     base_dir_one = base_dir / '01.XYM'
+    f606, f814 = _hstpass_catalog_counts(directory)
+    use_1exp = len(f606) == 1
     output_file_dir = base_dir / '03.LOC_TRANS' 
 
     output_file_img2sam = os.path.join(output_file_dir, in_img2sam_wfc3uv)
     output_run_xym2mat = os.path.join(output_file_dir, "run_xym2mat.src")
-    write_run_xym2mat_src_loc_trans(Path(output_run_xym2mat), base_dir_one)
+    write_run_xym2mat_src_loc_trans(
+        Path(output_run_xym2mat), base_dir_one, use_1exp=use_1exp
+    )
     write_in_img2sam_wfc3uv_loc_trans(camera,Path(output_file_img2sam), base_dir / "00.DATA")
 
     return
@@ -951,6 +991,9 @@ def loc_trans(camera,directory):
     Run the local transformation scripts in F814W and F606W subdirectories to extract 
     the pixels from each exposure and accurately transform their locations into the 
     reference frame so that we can use them to solve for a PSF and then use this PSF to model the target star.
+
+    Automatically selects ``1exp_xym2mat_new.e`` when ``01.XYM`` has one F606W and
+    two F814W hst1pass catalogs (single-F606W mode).
 
     Parameters
     ----------
@@ -1438,7 +1481,7 @@ def extract_psf_1(directory):
         with open(log_file, "w") as logf:
             try:
                 base_dir = Path(directory).resolve() / "04.EXTRACT_PSF"
-                filters = ['F814W']
+                filters = ['F814W', 'F606W']
                 for f in filters:
                     subdir = base_dir / f
                     script = 'run_uvp2psf_simst_1.src' if f == "F814W" else 'run_uvp2psf_simstV_1.src'
