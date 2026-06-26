@@ -174,6 +174,25 @@ _ACS_REFERENCE_DOWNLOADS = (
 )
 
 
+
+MATCHUP_JAY_HEADER = (
+    "#.......... ........... ........... ........... ........... "
+    "........... ........... ................ ....... ..... ..... ............\n"
+    "#    xbar        ybar        mbar        xsig        ysig        msig       "
+    " qbar    Nf  Ng  Nm Nmin Nstar     pki   pkj  pkp pkn pku\n"
+    "#    (01)        (02)        (03)        (04)        (05)        (06)      "
+    "  (07)   (08)(09)(10)(11)   (12)   (13)  (14) (15)(16)(17)\n"
+    "#.......... ........... ........... ........... ........... "
+    "........... ........... ................ ....... ..... ..... ............\n"
+)
+
+MATCHUP_CAL_ONLY_HEADER = (
+    "#.......... ........... .........\n"
+    "#    xbar        ybar        mbar\n"
+    "#    (01)        (02)        (03)\n"
+    "#.......... ........... .........\n"
+)
+
 UVP2TRI_FSKY_OUTPUTS_F814W = (
     "uvp2tri_scon_fsky_I_KeckNOcon.01.pix_all",
     "uvp2tri_scon_fsky_I_KeckNOcon.03.pix_use",
@@ -285,13 +304,7 @@ def print_uvp2tri_mcmc_acceptance_rate_3star(directory, filter_name, fit_folders
         string_3star = str(f"{filter_name}/{fit_folder}: MCMC acceptance rate = {rate:.4f} "f"({naccept} accepted, {nreject} rejected)")
     return string_3star
 
-def _download_url_to_path(
-    url: str,
-    out_path: Path,
-    timeout_s: float = 120.0,
-    *,
-    verbose: bool = False,
-) -> None:
+def _download_url_to_path(url, out_path, timeout_s, *, verbose):
     """Download ``url`` to ``out_path`` (write via a ``.part`` temp file)."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = out_path.with_suffix(out_path.suffix + ".part")
@@ -1214,6 +1227,194 @@ def cmd_rewrite_matchup_drop_xym2bar_echo(path: Path) -> None:
     pre, dat = cmd_partition_matchup_raw_lines(path)
     cmd_write_matchup_raw_lines(path, pre, dat)
 
+
+
+def resolve_dex_xyvieeee_path(directory):
+    """Return dex_no_gaia_STEP08_A.xyvieeee from 02.CMD or 01.XYM."""
+    root = Path(directory).resolve()
+    for sub in ("02.CMD", "01.XYM"):
+        candidate = root / sub / "dex_no_gaia_STEP08_A.xyvieeee"
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        f"dex_no_gaia_STEP08_A.xyvieeee not found under {root}/02.CMD or {root}/01.XYM"
+    )
+
+
+def _format_matchup_data_line(xbar, ybar, mbar, xsig, ysig, msig, lv, li, star_row, qbar=9.9990):
+    """One Jay Anderson MATCHUP row (xym2bar format 125)."""
+    lv_i = max(0, int(round(lv)))
+    li_i = max(0, int(round(li)))
+    nim_f = max(8, lv_i * 10) if lv_i else 8
+    nim_g = max(8, li_i * 8) if li_i else 8
+    nim_m = max(8, li_i * 10) if li_i else 8
+    nim_min = max(8, min(nim_f, nim_m))
+    pki = int(round(xbar)) % 10000
+    pkj = int(round(ybar)) % 10000
+    return (
+        f"{xbar:11.4f} {ybar:11.4f} {mbar:11.4f} {xsig:11.4f} {ysig:11.4f} "
+        f"{msig:11.4f} {qbar:11.4f} {nim_f:4d} {nim_g:4d} {nim_m:4d} {nim_min:4d} "
+        f"N{star_row:06d} {pki:5d} {pkj:5d} {nim_m:4d} {nim_m:4d} {nim_min:4d}"
+    )
+
+
+def write_matchup_from_dex_xyvieeee(dex_path, out_path, band="F814W"):
+    """
+    dex_no_gaia_STEP08_A.xyvieeee
+    -----------------------------
+    Each line from dex_no_gaia STEP08 looks like::
+
+        1559.795 4389.189   -7.284   -8.555      0.015  0.039  9.990  9.990   268.6038096  -28.7303315  2 2 1 1 000001
+
+    Column mapping to MATCHUP:
+
+    ====  ============  ==========================================
+    Col   Field         Used for MATCHUP
+    ====  ============  ==========================================
+    0     uu_bar        x position (xbar)
+    1     vv_bar        y position (ybar)
+    2     mv_bar        V magnitude (F606W)
+    3     mi_bar        I magnitude (F814W)
+    4-5   uu_sig, vv_sig  xsig, ysig
+    6-7   mv_sig, mi_sig  msig (V or I, depending on band)
+    12-13 Lv, Li        exposure-count fields -> Nf, Ng, Nm, Nmin
+    14    star id (Q)   not used; row number i becomes N000001, etc.
+    ====  ============  ==========================================
+
+    Output:
+    --------------
+    - Header: 4-line Jay Anderson header (MATCHUP_JAY_HEADER)
+    - One data row per dex line, formatted like xym2bar format 125::
+
+        1559.7950   4389.1890     -8.5550      0.0150      0.0390      0.0390      9.9990   10    8   10    8 N000001  1560  4389   10   10    8
+
+    Mapping logic:
+
+    - band="F814W" (default): mbar = col 3 (I), msig = col 7
+    - band="F606W": mbar = col 2 (V), msig = col 6
+    - Nstar: N{i:06d} where i is the 1-based row in the dex file (row 1 -> N000001)
+    - Nf/Ng/Nm/Nmin, pki/pkj: approximate placeholders derived from Lv/Li and x/y
+      (good enough for calibration; cal_star_num only needs x, y)
+
+    Parameters
+    ----------
+    dex_path : path to dex_no_gaia_STEP08_A.xyvieeee
+    out_path : output MATCHUP file (e.g. MATCHUP.F814W.XYM.02 or MATCHUP.F606W.XYM)
+    band : ``F814W`` uses I magnitudes (col 3); ``F606W`` uses V magnitudes (col 2)
+    """
+    dex_path = Path(dex_path)
+    out_path = Path(out_path)
+    data = np.loadtxt(dex_path)
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+    use_v = str(band).upper() == "F606W"
+    out_lines = MATCHUP_JAY_HEADER.rstrip("\n").split("\n")
+    for i, row in enumerate(data, start=1):
+        xbar, ybar = float(row[0]), float(row[1])
+        mbar = float(row[2] if use_v else row[3])
+        xsig, ysig = float(row[4]), float(row[5])
+        msig = float(row[6] if use_v else row[7])
+        lv, li = float(row[12]), float(row[13])
+        out_lines.append(
+            _format_matchup_data_line(xbar, ybar, mbar, xsig, ysig, msig, lv, li, i)
+        )
+    out_path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+    return out_path
+
+
+def write_cal_matchup_files(matchup_in, notfar_path, out_cal, out_cal_only, *, match_tol=0.1):
+    """
+  Annotate a MATCHUP catalog with calibration-star numbers from NOTFAR_CAL_STARS.
+
+  Matches cal stars by position (same criterion as cal_star_num_2_MATCHUP).
+  Falls back to the iMuref row index when the catalog was reordered after
+  NOTFAR was written, overlaying NOTFAR x/y on that row.
+  """
+    matchup_in = Path(matchup_in)
+    notfar_path = Path(notfar_path)
+    out_cal = Path(out_cal)
+    out_cal_only = Path(out_cal_only)
+
+    preamble, data_lines = cmd_partition_matchup_raw_lines(matchup_in)
+    if not preamble:
+        preamble = MATCHUP_JAY_HEADER.rstrip("\n").split("\n")
+
+    notfar = np.atleast_2d(np.loadtxt(notfar_path, skiprows=2))
+    parsed = []
+    for line in data_lines:
+        parts = line.split()
+        if len(parts) < 2:
+            parsed.append(None)
+            continue
+        parsed.append({"x": float(parts[0]), "y": float(parts[1]), "line": line})
+
+    cal_only_rows = []
+    out_data = []
+    tol2 = match_tol ** 2
+    for ic in range(notfar.shape[0]):
+        x_ref, y_ref = float(notfar[ic, 0]), float(notfar[ic, 1])
+        i_muref = int(notfar[ic, 5]) if notfar.shape[1] > 5 else 0
+        hit = None
+        for j, rec in enumerate(parsed):
+            if rec is None:
+                continue
+            dr2 = (rec["x"] - x_ref) ** 2 + (rec["y"] - y_ref) ** 2
+            if dr2 < tol2:
+                hit = j
+                break
+        if hit is None and 1 <= i_muref <= len(parsed):
+            hit = i_muref - 1
+            rec = parsed[hit]
+            if rec is not None:
+                parts = rec["line"].split()
+                parts[0] = f"{x_ref:.4f}"
+                parts[1] = f"{y_ref:.4f}"
+                new_line = (
+                    f"{parts[0]:>11} {parts[1]:>11} " + " ".join(parts[2:])
+                )
+                parsed[hit] = {"x": x_ref, "y": y_ref, "line": new_line}
+
+        if hit is None:
+            continue
+        base = parsed[hit]["line"].rstrip()
+        annotated = f"{base}{ic + 1:7d}"
+        parsed[hit]["line"] = annotated
+        mbar = annotated.split()[2]
+        cal_only_rows.append(
+            f"{x_ref:11.4f} {y_ref:11.4f} {float(mbar):11.4f}{ic + 1:8d}"
+        )
+
+    out_data = [rec["line"] if rec else "" for rec in parsed]
+    cmd_write_matchup_raw_lines(out_cal, preamble, out_data)
+    cal_only_body = MATCHUP_CAL_ONLY_HEADER + "".join(
+        row + "\n" for row in cal_only_rows
+    )
+    out_cal_only.write_text(cal_only_body, encoding="utf-8")
+    return out_cal, out_cal_only
+
+
+def ensure_matchup_catalogs_from_dex(directory):
+    """
+  Ensure 02.CMD contains MATCHUP.F814W.XYM.02 and MATCHUP.F606W.XYM.
+
+  Build them from dex_no_gaia_STEP08_A.xyvieeee (dex_no_gaia / 1exp_no_gaia output).
+  """
+    root = Path(directory).resolve()
+    cmd_dir = root / "02.CMD"
+    cmd_dir.mkdir(parents=True, exist_ok=True)
+    dex_path = resolve_dex_xyvieeee_path(directory)
+
+    f814 = cmd_dir / "MATCHUP.F814W.XYM.02"
+    f606 = cmd_dir / "MATCHUP.F606W.XYM"
+    if not f814.is_file():
+        write_matchup_from_dex_xyvieeee(dex_path, f814, band="F814W")
+        print(f"Wrote {f814} from {dex_path}")
+    if not f606.is_file():
+        write_matchup_from_dex_xyvieeee(dex_path, f606, band="F606W")
+        print(f"Wrote {f606} from {dex_path}")
+    return f814, f606, dex_path
+
+
 def cmd_diagram(directory):
 
 #    fortran_src = get_fortran_dir()
@@ -2037,7 +2238,7 @@ def tri_fit_F606W_opt(directory):
 
 
 
-def notebook_complete(message: str | None = None) -> None:
+def notebook_complete(message):
     """
     Call at the end of a MORIA notebook when the final pipeline step is done.
 
@@ -2159,31 +2360,56 @@ def calibration_input_file_two(directory):
     
 def calibration_new_matchup(directory):
     """
-    The goal here is to calibrate the HST photometry to the OGLE-III database.
+    Prepare 07.CALIBRATION matchup files for OGLE calibration.
+
+    Uses MATCHUP.F814W.XYM.02 / MATCHUP.F606W.XYM from 02.CMD when present.
+    Otherwise builds them from dex_no_gaia_STEP08_A.xyvieeee, then writes
+    MATCHUP.F814W_cal.XYM and MATCHUP.F814W_cal_only.XYM.
     """
+    root = Path(directory).resolve()
+    cal_dir = root / "07.CALIBRATION"
+    cal_dir.mkdir(parents=True, exist_ok=True)
 
-    #def prepare_data(good_psf, directory, f= 'F814W'):
-    #    base_dir = Path(directory).resolve()
-     #   subdir = base_dir / f
-      #  in_good_psf_list = 'IN.good_psf_list.2'
-      #  output_file_dir = base_dir / '04.EXTRACT_PSF' / f
-       # output_file_img = os.path.join(output_file_dir, in_good_psf_list)
+    for name in (
+        "NOTFAR_CAL_STARS.XYIVB_targ",
+        "NEARBY_SIM_STARS.XYIVB_targ",
+        "NEARBY_REF_STARS.XYIVB_targ",
+    ):
+        src = root / "04.EXTRACT_PSF" / "F814W" / name
+        if not src.is_file():
+            src = root / "02.CMD" / name
+        if src.is_file():
+            shutil.copy2(src, cal_dir / name)
 
+    f814_cmd, f606_cmd, _dex = ensure_matchup_catalogs_from_dex(directory)
+    shutil.copy2(f814_cmd, cal_dir / "MATCHUP.F814W.XYM.02")
+    shutil.copy2(f606_cmd, cal_dir / "MATCHUP.F606W.XYM")
 
-#        with open(output_file_img, "w") as f:
- #           for i in range(1, len(good_psf) + 1):
-  #              value = good_psf[i-1]
-   #             f.write(f"{i:2d}   {value}\n")
+    loc_trans = root / "03.LOC_TRANS" / "outputq.fits"
+    if loc_trans.is_file():
+        shutil.copy2(loc_trans, cal_dir / "outputq.fits")
+    else:
+        for alt in (
+            root / "02.CMD" / "outputq_F814W.fits",
+            root / "01.XYM" / "F814W" / "outputq_F814W.fits",
+        ):
+            if alt.is_file():
+                shutil.copy2(alt, cal_dir / "outputq.fits")
+                break
 
-    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "NOTFAR_CAL_STARS.XYIVB_targ")
-    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "NEARBY_SIM_STARS.XYIVB_targ")
-    copy_entire_files(source=Path(directory).resolve() / "04.EXTRACT_PSF" / "F814W", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "NEARBY_REF_STARS.XYIVB_targ")
+    notfar = cal_dir / "NOTFAR_CAL_STARS.XYIVB_targ"
+    if not notfar.is_file():
+        raise FileNotFoundError(
+            f"NOTFAR_CAL_STARS.XYIVB_targ not found under {cal_dir} or 04.EXTRACT_PSF/F814W"
+        )
 
-    copy_entire_files(source=Path(directory).resolve() / "02.CMD", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "MATCHUP.F606W.XYM")
-    copy_entire_files(source=Path(directory).resolve() / "02.CMD", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "MATCHUP.F814W.XYM.02")
-
-    copy_entire_files(source=Path(directory).resolve() / "03.LOC_TRANS", destination=Path(directory).resolve() / "07.CALIBRATION" , filename = "outputq.fits")
-
+    write_cal_matchup_files(
+        cal_dir / "MATCHUP.F814W.XYM.02",
+        notfar,
+        cal_dir / "MATCHUP.F814W_cal.XYM",
+        cal_dir / "MATCHUP.F814W_cal_only.XYM",
+    )
+    print("Wrote MATCHUP.F814W_cal.XYM and MATCHUP.F814W_cal_only.XYM")
 
     def psf_star_mags_mcmc(directory, script='run_psf_star_Imags_mcmc.src'):
         
@@ -2230,40 +2456,10 @@ def calibration_new_matchup(directory):
                 sys.stdout = sys.__stdout__
                 sys.stderr = sys.__stderr__
         print(f"Finished run_psf_star_Vmags_mcmc")
-        return 
-    
-
-    def cal_star_num(directory, script='run_cal_star_num_2_MATCHUP.src'):
-        
-        log_file = Path(directory).resolve() / "07.CALIBRATION" / "log_files" / f"run_cal_star_num_2_MATCHUP.log"
-        with open(log_file, "w") as logf:
-            try:
-                base_dir = Path(directory).resolve() / "07.CALIBRATION"
-                subdir = base_dir 
-                script = 'run_cal_star_num_2_MATCHUP.src'
-                script_path = base_dir / script
-                print(base_dir)
-                print(script_path)
-                subprocess.run(
-                    ["csh", str(script_path)],
-                    cwd=subdir,
-                    stdout=logf,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    check=False
-                )
-            finally:
-                sys.stdout = sys.__stdout__
-                sys.stderr = sys.__stderr__
-        print(f"Finished cal_star_num_2_MATCHUP")
         return
 
     psf_star_mags_mcmc(directory)
-    cal_star_num(directory)
-    #VI_HST_ogle_man_match4(directory)
-    #fit_HST_IV_ogle_col_1(directory)
-    
-    
+
 
 def calibration_hst_ogle_match(directory):
     """
@@ -2296,7 +2492,40 @@ def calibration_hst_ogle_match(directory):
         return
 
     VI_HST_ogle_man_match4(directory)
-    
+
+
+def fix_vi_hst_ogle_cal_matches4_spacing(directory):
+    """
+    VI_HST_ogle_man_match4 writes Vo-Vhfs (f9.4) and lg_c2Vmx (f8.3) adjacent.
+    Insert the missing space so fit_HST_IV_ogle_col can parse the file.
+    """
+    file_path = Path(directory).resolve() / "07.CALIBRATION" / "VI_HST_ogle_Cal_matches4.dat"
+    if not file_path.exists():
+        return
+
+    # f9.4 field ending in four decimals, immediately followed by a negative f8.3.
+    boundary = re.compile(r"\.\d{4}-")
+    out_lines = []
+    for line in file_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("#"):
+            out_lines.append(line)
+            continue
+        if len(line.split()) >= 23:
+            out_lines.append(line)
+            continue
+        matches = list(boundary.finditer(line))
+        if len(matches) >= 2:
+            idx = matches[1].end() - 1
+        elif matches:
+            idx = matches[0].end() - 1
+        else:
+            out_lines.append(line)
+            continue
+        line = line[:idx] + " " + line[idx:]
+        out_lines.append(line)
+
+    file_path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+
 
 def fit_calibration(directory):
     """
@@ -2339,7 +2568,7 @@ def fit_calibration(directory):
                 sys.stderr = sys.__stderr__
         print(f"Finished fitting calibration")
         return
-
+    fix_vi_hst_ogle_cal_matches4_spacing(directory)
     fit_HST_IV_ogle_col_1(directory)
 
 def get_chip_number(ogle_ra_deg, ogle_dec_deg):
@@ -2364,14 +2593,8 @@ def get_chip_number(ogle_ra_deg, ogle_dec_deg):
 
 
 
-def ogle_map_and_reference_filenames(
-    ogle_field_number: int,
-    ogle_chip_number: int,
-    ogle_band: str = "I",
-    *,
-    map_prefix_case: str = "upper",
-    ref_prefix_case: str = "lower",
-):
+def ogle_map_and_reference_filenames(ogle_field_number, ogle_chip_number, ogle_band="I",
+ map_prefix_case="upper", ref_prefix_case="lower"):
     """
     Construct the OGLE-III blg filenames from a field + chip identifier.
 
@@ -2402,19 +2625,10 @@ def ogle_map_and_reference_filenames(
     }
 
 
-def download_ogle_map_and_reference(
-    directory: str | Path,
-    ogle_field_number: int,
-    ogle_chip_number: int,
-    ogle_band: str = "I",
-    destination_subdir: str = "07.CALIBRATION",
-    overwrite: bool = False,
-    map_prefix_case: str = "upper",
-    ref_prefix_case: str = "lower",
-    maps_base_url: str = "http://www.astrouw.edu.pl/ogle/ogle3/maps/blg/maps/",
-    ref_images_base_url: str = "http://www.astrouw.edu.pl/ogle/ogle3/maps/blg/ref_images/",
-    timeout_s: float = 120.0,
-):
+def download_ogle_map_and_reference(directory, ogle_field_number, ogle_chip_number, ogle_band="I", 
+                                    destination_subdir="07.CALIBRATION", overwrite=False, map_prefix_case="upper", ref_prefix_case="lower", 
+                                    maps_base_url="http://www.astrouw.edu.pl/ogle/ogle3/maps/blg/maps/", ref_images_base_url="http://www.astrouw.edu.pl/ogle/ogle3/maps/blg/ref_images/", timeout_s=120.0):
+                                        
     """
     Download the OGLE-III photometry map and reference image needed for calibration.
 
@@ -2486,23 +2700,28 @@ def download_ogle_map_and_reference(
     used_map_url = try_download_candidates(map_candidates, map_path)
     used_ref_url = try_download_candidates(ref_candidates, ref_path)
 
+    subset_map_path = dest_dir / f"New_{fn['map_filename_local']}"
+    columns = ["ogle_x", "ogle_y", "V", "I"]
+    df = pd.read_csv( map_path, header=None, sep=r"\s+", usecols=[3, 4, 5, 7], names=columns)
+    with open(subset_map_path, "w", encoding="utf-8") as f:
+        f.write("ogle_x ogle_y V I\n")
+        for row in df.itertuples(index=False):
+            f.write(
+                f"{row.ogle_x:7.2f} {row.ogle_y:7.2f} {row.V:6.3f} {row.I:6.3f}\n"
+            )
+
     return {
         "map_url": used_map_url,
         "ref_url": used_ref_url,
         "map_path": str(map_path),
+        "subset_map_path": str(subset_map_path),
         "ref_path": str(ref_path),
     }
 
 
-def ogle_field_chip_candidates_from_coords(
-    ra_deg: float,
-    dec_deg: float,
-    phase: str | int = 3,
-    epoch: str | float = 2000.0,
-    assume_ra_is_hours_if_lt_24: bool = True,
-    base_url: str = "https://ogle.astrouw.edu.pl/cgi-ogle/uncgi.cgi/radec2field",
-    timeout_s: float = 30.0,
-) -> list[dict]:
+def ogle_field_chip_candidates_from_coords(ra_deg, dec_deg, phase=3, epoch=2000.0,
+ assume_ra_is_hours_if_lt_24=True, base_url="https://ogle.astrouw.edu.pl/cgi-ogle/uncgi.cgi/radec2field", 
+ timeout_s=30.0):
     """
     Query the OGLE Field Finder to get candidate OGLE-III fields + chip numbers.
 

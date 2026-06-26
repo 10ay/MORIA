@@ -1,5 +1,10 @@
 # MORIA: Microlensing Object high-Resolution Imaging Analysis (MORIA)
 
+## Website 
+
+
+[Click here for website](https://10ay.github.io/MORIA/)
+
 ## How to Install
 
 The easiest way to install this code is to first clone it. You can do this by running the command below:
@@ -11,6 +16,11 @@ Once installed, navigate to inside the MORIA folder and run:
     pip install -e .
 
 Git clone the repository, and run 'pip install -e .' in the src folder. Don't forget the dot after the '-e'. 
+
+Copy notebooks to your analysis directory:
+
+    cp -r demo/notebooks/* /path/to/your/project/
+    cp -r data/* /path/to/your/project/
 
 ## Tutorial
 
