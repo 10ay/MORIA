@@ -21,6 +21,375 @@ import bz2
 import urllib.parse
 import re
 
+
+def _get_cal_matches4_field_specs():
+    return (
+        [("i6", 6)]
+        + [("F9.3", 9)] * 2
+        + [("i5", 5)] * 2
+        + [("f8.3", 8)] * 5
+        + [("f9.4", 9)]
+        + [("f8.3", 8)] * 5
+        + [("f9.4", 9)]
+        + [("f8.3", 8)] * 6
+    )
+
+
+def _format_cal_matches4_field(spec: str, value) -> str:
+    if spec == "i6":
+        return f"{int(value):6d}"
+    if spec == "i5":
+        return f"{int(value):5d}"
+    if spec == "F9.3":
+        return f"{float(value):9.3f}"
+    if spec == "f8.3":
+        return f"{float(value):8.3f}"
+    if spec == "f9.4":
+        return f"{float(value):9.4f}"
+    raise ValueError(f"unknown Cal_matches4 field spec: {spec}")
+
+
+def _format_cal_matches4_line(values) -> str:
+    specs = _get_cal_matches4_field_specs()
+    return "".join(
+        _format_cal_matches4_field(spec, value)
+        for (spec, _width), value in zip(specs, values)
+    )
+
+
+def _parse_cal_matches4_field_token(spec: str, token: str):
+    token = token.strip()
+    if token and set(token) == {"*"}:
+        return 99.999
+    if spec in {"i6", "i5"}:
+        return int(token)
+    return float(token)
+
+
+def _parse_cal_matches4_values(line: str):
+    """Parse one format-999 row from fixed-width or repaired free-form text."""
+    specs = _get_cal_matches4_field_specs()
+    repaired = line.rstrip()
+    repaired = re.sub(r"(\.\d{4})(\*{6,})", r"\1 \2", repaired)
+    repaired = re.sub(r"(\.\d{4})(-)", r"\1 \2", repaired)
+
+    expected_len = sum(width for _, width in specs)
+    if "*" not in repaired and len(repaired) == expected_len:
+        values = []
+        pos = 0
+        for spec, width in specs:
+            chunk = repaired[pos : pos + width]
+            values.append(_parse_cal_matches4_field_token(spec, chunk))
+            pos += width
+        return values
+
+    tokens = repaired.split()
+    if len(tokens) < len(specs):
+        raise ValueError(f"expected {len(specs)} fields, got {len(tokens)}")
+    return [
+        _parse_cal_matches4_field_token(spec, token)
+        for (spec, _width), token in zip(specs, tokens)
+    ]
+
+
+def _repair_vi_hst_cal_matches4_data_line(line: str) -> str:
+    """
+    Repair one VI_HST_ogle_Cal_matches4 data row while preserving Fortran
+    format-999 fixed-width columns.
+    """
+    specs = _get_cal_matches4_field_specs()
+    stripped = line.rstrip()
+    if not stripped or stripped.startswith("#"):
+        return stripped
+    if not re.match(r"^\s*\d", stripped):
+        return stripped
+
+    expected_len = sum(width for _, width in specs)
+    if "*" not in stripped and len(stripped) == expected_len:
+        try:
+            values = _parse_cal_matches4_values(stripped)
+            if not (
+                (values[9] == 0.0 and values[8] != 0.0)
+                or (values[15] == 0.0 and values[14] != 0.0)
+            ):
+                return stripped
+        except ValueError:
+            return stripped
+
+    try:
+        values = _parse_cal_matches4_values(stripped)
+    except ValueError:
+        return stripped
+    # psf_star_mags with sky_model=0 writes ZMIN instead of A1_min, leaving I_hfs=0.
+    if values[9] == 0.0 and values[8] != 0.0:
+        values[9] = values[8]
+    if values[15] == 0.0 and values[14] != 0.0:
+        values[15] = values[14]
+    return _format_cal_matches4_line(values)
+
+
+def fix_vi_hst_ogle_cal_matches4_spacing(directory):
+    """
+    VI_HST_ogle_man_match4 writes Cal_matches4 with glued f9.4/f8.3 fields and
+    Fortran overflow masks (********). Normalize spacing and replace overflow
+    tokens so fit_HST_IV_ogle_col can parse the file.
+    """
+    file_path = Path(directory).resolve() / "07.CALIBRATION" / "VI_HST_ogle_Cal_matches4.dat"
+    if not file_path.exists():
+        return
+
+    out_lines = [
+        _repair_vi_hst_cal_matches4_data_line(line)
+        for line in file_path.read_text(encoding="utf-8").splitlines()
+    ]
+    file_path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+
+
+_OGLE_AS_PIX = 0.26
+
+
+def _parse_psf_star_fsky_table(psf_path):
+    """Return PSF-star fsky mags keyed by star number."""
+    psf_path = Path(psf_path)
+    if not psf_path.is_file():
+        return {}
+    band = "Imag" if "_I." in psf_path.name or "Cal_I" in psf_path.name else "Vmag"
+    lg_key = "lg_c2_I" if band == "Imag" else "lg_c2_V"
+    stars = {}
+    kstar = None
+    chi2 = -1.0
+    for line in psf_path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("# BEST-FIT MODEL"):
+            kstar = int(line.split(":")[-1])
+            chi2 = -1.0
+        elif line.startswith("# chi2MIN =") and kstar is not None:
+            tail = line.split("=", 1)[1].strip()
+            chi2 = -1.0 if "*" in tail else float(tail)
+        elif line.startswith("#  A1_min =") and kstar is not None:
+            a1 = float(line.split("=", 1)[1])
+            mag = -2.5 * np.log10(a1)
+            lg = 99.999 if chi2 <= 0 else np.log10(chi2) + 0.25 * mag
+            stars.setdefault(kstar, {})[band] = mag
+            stars[kstar][lg_key] = lg
+    return stars
+
+
+def _fit_bar_to_ogle_from_vi_hst_in(in_path):
+    """Affine bar(MATCHUP) -> OGLE map fit from manual IN anchors."""
+    pairs = []
+    for line in Path(in_path).read_text(encoding="utf-8").splitlines()[7:]:
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        bar = (float(parts[0]), float(parts[1]))
+        ogle = (float(parts[2]), float(parts[3]))
+        if bar[0] == 0.0 and bar[1] == 0.0:
+            continue
+        pairs.append((bar, ogle))
+    if len(pairs) < 3:
+        raise ValueError(f"need at least 3 manual anchors in {in_path}")
+    design = []
+    target = []
+    for (xb, yb), (xo, yo) in pairs:
+        design.append([xb, yb, 1.0, 0.0, 0.0, 0.0])
+        design.append([0.0, 0.0, 0.0, xb, yb, 1.0])
+        target.extend([xo, yo])
+    coeff, _, _, _ = np.linalg.lstsq(np.array(design), np.array(target), rcond=None)
+
+    def bar_to_ogle(xb, yb):
+        return (
+            coeff[0] * xb + coeff[1] * yb + coeff[2],
+            coeff[3] * xb + coeff[4] * yb + coeff[5],
+        )
+
+    return bar_to_ogle, pairs
+
+
+def _parse_all_matches4_row(line: str):
+    parts = line.split()
+    if len(parts) < 17:
+        return None
+    try:
+        return {
+            "cal": int(parts[0]),
+            "x": float(parts[1]),
+            "y": float(parts[2]),
+            "nmat": int(parts[3]),
+            "nbmat": int(parts[4]),
+            "I_ogle": float(parts[5]),
+            "V_ogle": float(parts[6]),
+            "I_hst1": float(parts[7]),
+            "I_hst": float(parts[8]),
+            "I_hstB": float(parts[9]),
+            "V_hst1": float(parts[10]),
+            "V_hst": float(parts[11]),
+            "V_hstB": float(parts[12]),
+            "Io_Ih1": float(parts[13]),
+            "Io_Ih": float(parts[14]),
+            "Vo_Vh1": float(parts[15]),
+            "Vo_Vh": float(parts[16]),
+        }
+    except ValueError:
+        return None
+
+
+def _cal_matches4_header_lines(cal_dir):
+    headers = []
+    path = cal_dir / "VI_HST_ogle_Cal_matches4.dat"
+    if path.is_file():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped and (stripped[0].isdigit() or (line.startswith(" ") and stripped[0].isdigit())):
+                break
+            headers.append(line)
+    if len(headers) < 6:
+        headers = [
+            "# I_fsky file =",
+            "psf_star_mags_Cal_I.05.final_fits",
+            "# V_fsky file =",
+            "psf_star_mags_Cal_V.05.final_fits",
+            "# match radius in arc sec =   50.00 HWHMa =   0.40 HWHMb =   1.00  A_lg_chi2_I, A_lg_chi2_V =   0.250   0.250",
+            "# Cal#   x        y     nmat nbmat I_ogle  V_ogle  I_hst1  I_hst   I_hfs   Io-Ihfs lg_c2Imx I_hstB  V_hst1  V_hst   V_hfs   Vo-Vhfs lg_c2Vmx V_hstB  Io-Ih1  Io-Ih   Vo-Vh1  Vo-Vh",
+        ]
+    return headers
+
+
+def _assign_psf_star_index(row, psf_i, psf_v):
+    best = None
+    best_score = None
+    for kstar, data in psf_i.items():
+        imag = data.get("Imag")
+        if imag is None:
+            continue
+        vmag = psf_v.get(kstar, {}).get("Vmag", row["V_hst"])
+        score = abs(row["I_hst"] - imag) + abs(row["V_hst"] - vmag)
+        if best_score is None or score < best_score:
+            best_score = score
+            best = kstar
+    return best or 1
+
+
+def _build_cal_matches4_values(row, psf_num, psf_i, psf_v):
+    i_fsky = psf_i.get(psf_num, {}).get("Imag", row["I_hst"])
+    v_fsky = psf_v.get(psf_num, {}).get("Vmag", row["V_hst"])
+    if i_fsky == 0.0:
+        i_fsky = row["I_hst"]
+    if v_fsky == 0.0:
+        v_fsky = row["V_hst"]
+    lg_c2_i = psf_i.get(psf_num, {}).get("lg_c2_I", 0.0)
+    lg_c2_v = psf_v.get(psf_num, {}).get("lg_c2_V", 0.0)
+    return [
+        psf_num,
+        row["x"],
+        row["y"],
+        row["nmat"],
+        row["nbmat"],
+        row["I_ogle"],
+        row["V_ogle"],
+        row["I_hst1"],
+        row["I_hst"],
+        i_fsky,
+        row["I_ogle"] - i_fsky,
+        lg_c2_i,
+        row["I_hstB"],
+        row["V_hst1"],
+        row["V_hst"],
+        v_fsky,
+        row["V_ogle"] - v_fsky,
+        lg_c2_v,
+        row["V_hstB"],
+        row["Io_Ih1"],
+        row["Io_Ih"],
+        row["Vo_Vh1"],
+        row["Vo_Vh"],
+    ]
+
+
+def expand_vi_hst_cal_matches_for_fit(
+    directory, *, min_stars=12, match_arcsec=2.0, max_stars=20
+):
+    """
+    VI_HST only tags 11 bar cal stars, but few land on OGLE sources at HWHMa.
+    Rebuild Cal_matches4 from all_matches near manual anchors + NOTFAR positions.
+    """
+    cal_dir = Path(directory).resolve() / "07.CALIBRATION"
+    all_path = cal_dir / "VI_HST_ogle_all_matches4.dat"
+    out_path = cal_dir / "VI_HST_ogle_Cal_matches4.dat"
+    in_path = cal_dir / "IN.VI_HST_ogle_man_match4"
+    if not all_path.is_file() or not in_path.is_file():
+        return
+
+    bar_to_ogle, anchor_pairs = _fit_bar_to_ogle_from_vi_hst_in(in_path)
+    ogle_targets = [ogle for _bar, ogle in anchor_pairs]
+    notfar = cal_dir / "NOTFAR_CAL_STARS.XYIVB_targ"
+    if notfar.is_file():
+        for row in np.atleast_2d(np.loadtxt(notfar, skiprows=2)):
+            ogle_targets.append(bar_to_ogle(float(row[0]), float(row[1])))
+
+    match_rad = match_arcsec / _OGLE_AS_PIX
+    candidates = []
+    for line in all_path.read_text(encoding="utf-8").splitlines():
+        row = _parse_all_matches4_row(line)
+        if row is None:
+            continue
+        if row["nmat"] <= 0 or row["nbmat"] <= 0:
+            continue
+        if row["I_hst"] > 90 or row["V_hst"] > 90 or row["I_ogle"] > 30:
+            continue
+        nearest = min(
+            ((row["x"] - tx) ** 2 + (row["y"] - ty) ** 2) ** 0.5
+            for tx, ty in ogle_targets
+        )
+        if nearest <= match_rad:
+            candidates.append((nearest, row))
+
+    if len(candidates) < min_stars:
+        extra = []
+        for line in all_path.read_text(encoding="utf-8").splitlines():
+            row = _parse_all_matches4_row(line)
+            if row is None:
+                continue
+            if row["nmat"] <= 0 or row["nbmat"] <= 0:
+                continue
+            if row["I_hst"] > 90 or row["V_hst"] > 90:
+                continue
+            nearest = min(
+                ((row["x"] - tx) ** 2 + (row["y"] - ty) ** 2) ** 0.5
+                for tx, ty in ogle_targets
+            )
+            extra.append((nearest, row))
+        extra.sort(key=lambda item: item[0])
+        seen = {(round(r["x"], 3), round(r["y"], 3)) for _, r in candidates}
+        for dist, row in extra:
+            key = (round(row["x"], 3), round(row["y"], 3))
+            if key in seen:
+                continue
+            candidates.append((dist, row))
+            seen.add(key)
+            if len(candidates) >= min_stars:
+                break
+
+    candidates.sort(key=lambda item: item[0])
+    candidates = candidates[:max_stars]
+    if not candidates:
+        return
+
+    psf_i = _parse_psf_star_fsky_table(cal_dir / "psf_star_mags_Cal_I.05.final_fits")
+    psf_v = _parse_psf_star_fsky_table(cal_dir / "psf_star_mags_Cal_V.05.final_fits")
+    used_psf = set()
+    data_lines = []
+    for _dist, row in candidates:
+        psf_num = _assign_psf_star_index(row, psf_i, psf_v)
+        while psf_num in used_psf and psf_num < 99:
+            psf_num += 1
+        used_psf.add(psf_num)
+        data_lines.append(_format_cal_matches4_line(_build_cal_matches4_values(row, psf_num, psf_i, psf_v)))
+
+    headers = _cal_matches4_header_lines(cal_dir)
+    out_path.write_text("\n".join(headers + data_lines) + "\n", encoding="utf-8")
+    print(f"Expanded {out_path.name} to {len(data_lines)} calibration stars")
+
+
 parser = argparse.ArgumentParser()
 
 def get_fortran_dir():
@@ -1230,32 +1599,320 @@ def cmd_rewrite_matchup_drop_xym2bar_echo(path: Path) -> None:
 
 
 def resolve_dex_xyvieeee_path(directory):
-    """Return dex_no_gaia_STEP08_A.xyvieeee from 02.CMD or 01.XYM."""
+    """Return dex_no_gaia_STEP08_A.xyvieeee from 07.CALIBRATION, 02.CMD, or 01.XYM."""
     root = Path(directory).resolve()
-    for sub in ("02.CMD", "01.XYM"):
+    for sub in ("07.CALIBRATION", "02.CMD", "01.XYM"):
         candidate = root / sub / "dex_no_gaia_STEP08_A.xyvieeee"
         if candidate.is_file():
             return candidate
     raise FileNotFoundError(
-        f"dex_no_gaia_STEP08_A.xyvieeee not found under {root}/02.CMD or {root}/01.XYM"
+        f"dex_no_gaia_STEP08_A.xyvieeee not found under "
+        f"{root}/07.CALIBRATION, {root}/02.CMD, or {root}/01.XYM"
     )
 
 
-def _format_matchup_data_line(xbar, ybar, mbar, xsig, ysig, msig, lv, li, star_row, qbar=9.9990):
-    """One Jay Anderson MATCHUP row (xym2bar format 125)."""
-    lv_i = max(0, int(round(lv)))
-    li_i = max(0, int(round(li)))
-    nim_f = max(8, lv_i * 10) if lv_i else 8
-    nim_g = max(8, li_i * 8) if li_i else 8
-    nim_m = max(8, li_i * 10) if li_i else 8
-    nim_min = max(8, min(nim_f, nim_m))
-    pki = int(round(xbar)) % 10000
-    pkj = int(round(ybar)) % 10000
-    return (
+_MATCHUP_DATA_LINE_LEN = 133
+
+
+def _format_matchup_data_line(
+    xbar, ybar, mbar, xsig, ysig, msig, detection_count, star_row, qbar=9.9990
+):
+    """
+    One xym2bar MATCHUP row (format 125, 133 chars).
+
+    pkp/pkn/pku occupy the final three i4 fields; pku is column (17).  Cal-star
+    tags are appended after column 133 so VI_HST_ogle_man_match4 reads them from
+    cols 135-140 without confusing pkp with the calibration number.
+    """
+    nim = max(1, int(round(detection_count)))
+    pki = int(round(xbar))
+    pkj = int(round(ybar))
+    line = (
         f"{xbar:11.4f} {ybar:11.4f} {mbar:11.4f} {xsig:11.4f} {ysig:11.4f} "
-        f"{msig:11.4f} {qbar:11.4f} {nim_f:4d} {nim_g:4d} {nim_m:4d} {nim_min:4d} "
-        f"N{star_row:06d} {pki:5d} {pkj:5d} {nim_m:4d} {nim_m:4d} {nim_min:4d}"
+        f"{msig:11.4f} {qbar:11.4f} {nim:4d}{nim:4d}{nim:4d}{nim:4d} "
+        f"N{star_row:06d} {pki:5d} {pkj:5d} {nim:4d}{nim:4d}{nim:4d}"
     )
+    if len(line) != _MATCHUP_DATA_LINE_LEN:
+        raise ValueError(
+            f"MATCHUP row length {len(line)} != {_MATCHUP_DATA_LINE_LEN}: {line!r}"
+        )
+    return line
+
+
+def _parse_matchup_data_line(line: str):
+    """Parse one Jay Anderson MATCHUP data row; drop trailing cal annotation."""
+    base = line.rstrip()
+    if len(base) > _MATCHUP_DATA_LINE_LEN:
+        tail = base[_MATCHUP_DATA_LINE_LEN:].strip()
+        if tail.isdigit():
+            base = base[:_MATCHUP_DATA_LINE_LEN]
+    parts = base.split()
+    if len(parts) < 17:
+        return None
+    star_token = parts[11]
+    if not star_token.startswith("N"):
+        return None
+    return {
+        "xbar": float(parts[0]),
+        "ybar": float(parts[1]),
+        "mbar": float(parts[2]),
+        "xsig": float(parts[3]),
+        "ysig": float(parts[4]),
+        "msig": float(parts[5]),
+        "qbar": float(parts[6]),
+        "detection_count": int(parts[7]),
+        "star_row": int(star_token[1:]),
+    }
+
+
+def _matchup_line_from_fields(fields, *, xbar=None, ybar=None) -> str:
+    """Rebuild a fixed-width MATCHUP row from parsed fields."""
+    return _format_matchup_data_line(
+        xbar if xbar is not None else fields["xbar"],
+        ybar if ybar is not None else fields["ybar"],
+        fields["mbar"],
+        fields["xsig"],
+        fields["ysig"],
+        fields["msig"],
+        fields["detection_count"],
+        fields["star_row"],
+        fields["qbar"],
+    )
+
+
+def _annotate_matchup_cal_line(base_line: str, cal_num: int) -> str:
+    """Append cal-star index after the 133-char xym2bar row."""
+    base = base_line.rstrip()
+    if len(base) > _MATCHUP_DATA_LINE_LEN and base[_MATCHUP_DATA_LINE_LEN:].strip().isdigit():
+        base = base[:_MATCHUP_DATA_LINE_LEN]
+    elif len(base) < _MATCHUP_DATA_LINE_LEN:
+        fields = _parse_matchup_data_line(base)
+        if fields is None:
+            return base_line
+        base = _matchup_line_from_fields(fields)
+    if len(base) < _MATCHUP_DATA_LINE_LEN:
+        base = base + " " * (_MATCHUP_DATA_LINE_LEN - len(base))
+    return base[:_MATCHUP_DATA_LINE_LEN] + f"{cal_num:7d}"
+
+
+def _notfar_is_bar_space(notfar_path):
+    """NOTFAR bar catalogs use x/y > 1000; uuref lists stay near the image origin."""
+    data = np.atleast_2d(np.loadtxt(notfar_path, skiprows=2))
+    return float(data[0, 0]) > 1000.0
+
+
+def _resolve_calibration_notfar(directory, cal_dir, *, f814_matchup=None):
+    """Use bar-space NOTFAR for bar MATCHUP annotation."""
+    root = Path(directory).resolve()
+    cal_dir = Path(cal_dir)
+    dest = cal_dir / "NOTFAR_CAL_STARS.XYIVB_targ"
+    if dest.is_file() and not _notfar_is_bar_space(dest):
+        dest.unlink()
+    candidates = [
+        dest,
+        root / "04.EXTRACT_PSF" / "F814W" / "NOTFAR_CAL_STARS.XYIVB_targ",
+        root / "02.CMD" / "NOTFAR_CAL_STARS.XYIVB_targ",
+        *sorted(root.glob("07.CALIBRATION*/NOTFAR_CAL_STARS.XYIVB_targ")),
+    ]
+    seen = set()
+    bar_candidates = []
+    for path in candidates:
+        path = path.resolve()
+        if path in seen or not path.is_file():
+            continue
+        seen.add(path)
+        if _notfar_is_bar_space(path):
+            bar_candidates.append(path)
+    if not bar_candidates:
+        raise FileNotFoundError(
+            "Bar-space NOTFAR_CAL_STARS.XYIVB_targ not found. Place the bar-frame "
+            f"catalog in {cal_dir} (coords > 1000) before calibration_new_matchup."
+        )
+    chosen = bar_candidates[0]
+    if chosen.resolve() != dest.resolve():
+        shutil.copy2(chosen, dest)
+    return dest
+
+
+def _ensure_psf_mcmc_fit_sky(directory):
+    """psf_star_mags_mcmc needs sky_model=1 (line 7) to write A1_min for I_hfs."""
+    cal_dir = Path(directory).resolve() / "07.CALIBRATION"
+    for name in ("IN.psf_star_mags_mcmc_I", "IN.psf_star_mags_mcmc_V"):
+        path = cal_dir / name
+        if not path.is_file():
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        if len(lines) < 7:
+            continue
+        if lines[6].strip() != "1":
+            lines[6] = "1"
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _matchup_has_bar_anchor(matchup_path):
+    """True when the catalog already carries the IN-file bar anchor near 6252/4738."""
+    for line in Path(matchup_path).read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        fields = _parse_matchup_data_line(line)
+        if fields is None:
+            continue
+        return fields["xbar"] > 5000.0
+    return False
+
+
+def _reformat_matchup_exposure_inplace(matchup_path, detection_count):
+    """Rewrite MATCHUP rows in place, preserving the 133-char xym2bar layout."""
+    matchup_path = Path(matchup_path)
+    preamble, data_lines = cmd_partition_matchup_raw_lines(matchup_path)
+    if not preamble:
+        preamble = MATCHUP_JAY_HEADER.rstrip("\n").split("\n")
+    out_lines = []
+    for line in data_lines:
+        fields = _parse_matchup_data_line(line)
+        if fields is None:
+            out_lines.append(line)
+            continue
+        fields["detection_count"] = detection_count
+        rebuilt = _matchup_line_from_fields(fields)
+        tail = line.rstrip()
+        if len(tail) > _MATCHUP_DATA_LINE_LEN and tail[_MATCHUP_DATA_LINE_LEN:].strip().isdigit():
+            rebuilt += tail[_MATCHUP_DATA_LINE_LEN:]
+        out_lines.append(rebuilt)
+    cmd_write_matchup_raw_lines(matchup_path, preamble, out_lines)
+    return matchup_path
+
+
+def _matchup_detection_count(lv, li, band):
+    """Use dex_no_gaia exposure counts directly for synthetic MATCHUP rows."""
+    if str(band).upper() == "F606W":
+        return max(1, int(round(lv)))
+    return max(1, int(round(li)))
+
+
+def _find_matchup_catalog_candidates(directory, band):
+    """Return existing MATCHUP catalogs for a field (most specific first)."""
+    root = Path(directory).resolve()
+    name = "MATCHUP.F814W.XYM.02" if band == "F814W" else "MATCHUP.F606W.XYM"
+    filt = "F814W" if band == "F814W" else "F606W"
+    return [
+        p
+        for p in (
+            root / "07.CALIBRATION" / name,
+            root / "01.XYM" / filt / name,
+            root / "02.CMD" / name,
+            root / name,
+        )
+        if p.is_file()
+    ]
+
+
+def _notfar_position_match_fraction(matchup_path, notfar_path, *, match_tol=0.1):
+    """Fraction of NOTFAR cal stars that match MATCHUP x/y (uuref frame)."""
+    matchup_path = Path(matchup_path)
+    notfar_path = Path(notfar_path)
+    if not matchup_path.is_file() or not notfar_path.is_file():
+        return 0.0
+    try:
+        notfar = np.atleast_2d(np.loadtxt(notfar_path, skiprows=2))
+        if notfar.size == 0:
+            return 0.0
+        stars = []
+        for line in cmd_partition_matchup_raw_lines(matchup_path)[1]:
+            fields = _parse_matchup_data_line(line)
+            if fields is not None:
+                stars.append((fields["xbar"], fields["ybar"]))
+        if not stars:
+            return 0.0
+        tol2 = match_tol ** 2
+        hits = 0
+        for row in notfar:
+            x_ref, y_ref = float(row[0]), float(row[1])
+            if min((x - x_ref) ** 2 + (y - y_ref) ** 2 for x, y in stars) < tol2:
+                hits += 1
+        return hits / notfar.shape[0]
+    except Exception:
+        return 0.0
+
+
+def _resolve_matchup_catalog_source(directory, band, notfar_path=None):
+    """
+    Pick the best MATCHUP catalog for calibration.
+
+    Prefer catalogs already in 07.CALIBRATION for this field. Fall back to
+    xym2bar outputs that agree with NOTFAR positions, then 02.CMD / field root.
+    Dex-built bar-coordinate catalogs are only used when no suitable catalog exists.
+    """
+    root = Path(directory).resolve()
+    if notfar_path is None:
+        for candidate in (
+            root / "07.CALIBRATION" / "NOTFAR_CAL_STARS.XYIVB_targ",
+            root / "04.EXTRACT_PSF" / "F814W" / "NOTFAR_CAL_STARS.XYIVB_targ",
+            root / "02.CMD" / "NOTFAR_CAL_STARS.XYIVB_targ",
+        ):
+            if candidate.is_file():
+                notfar_path = candidate
+                break
+
+    cal_name = "MATCHUP.F814W.XYM.02" if band == "F814W" else "MATCHUP.F606W.XYM"
+    cal_matchup = root / "07.CALIBRATION" / cal_name
+    if cal_matchup.is_file():
+        return cal_matchup, 1.0
+
+    best = None
+    best_score = -1.0
+    for candidate in _find_matchup_catalog_candidates(directory, band):
+        if candidate.resolve() == cal_matchup.resolve():
+            continue
+        score = _notfar_position_match_fraction(candidate, notfar_path)
+        if score > best_score:
+            best_score = score
+            best = candidate
+    return best, best_score
+
+
+def _matchup_needs_rebuild_from_dex(matchup_path, dex_path, band, *, notfar_path=None):
+    """
+    Rebuild obviously synthetic/bad MATCHUP files.
+
+    For 1- or 2-exposure datasets the dex_no_gaia counts should be small.
+    Older placeholder catalogs used hard-coded values like 10/8/10/8, which
+    break downstream assumptions in calibration.
+
+    Do not replace xym2bar catalogs that already match NOTFAR cal-star positions.
+    """
+    matchup_path = Path(matchup_path)
+    dex_path = Path(dex_path)
+    if not matchup_path.is_file():
+        return True
+
+    if _notfar_position_match_fraction(matchup_path, notfar_path) >= 0.8:
+        return False
+
+    try:
+        dex = np.loadtxt(dex_path)
+        if dex.ndim == 1:
+            dex = dex.reshape(1, -1)
+        max_expected = 1
+        for row in dex:
+            max_expected = max(
+                max_expected, _matchup_detection_count(float(row[12]), float(row[13]), band)
+            )
+
+        with open(matchup_path, "r", encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split()
+                if len(parts) < 17:
+                    return True
+                counts = [int(parts[7]), int(parts[8]), int(parts[9]), int(parts[10])]
+                return any(count > max_expected for count in counts)
+    except Exception:
+        return True
+
+    return False
 
 
 def write_matchup_from_dex_xyvieeee(dex_path, out_path, band="F814W"):
@@ -1293,8 +1950,9 @@ def write_matchup_from_dex_xyvieeee(dex_path, out_path, band="F814W"):
     - band="F814W" (default): mbar = col 3 (I), msig = col 7
     - band="F606W": mbar = col 2 (V), msig = col 6
     - Nstar: N{i:06d} where i is the 1-based row in the dex file (row 1 -> N000001)
-    - Nf/Ng/Nm/Nmin, pki/pkj: approximate placeholders derived from Lv/Li and x/y
-      (good enough for calibration; cal_star_num only needs x, y)
+    - Nf/Ng/Nm/Nmin are set from the dex exposure counts for the requested band
+      (Lv for F606W, Li for F814W), so 1- and 2-exposure fields stay consistent
+      with the actual dataset.
 
     Parameters
     ----------
@@ -1315,8 +1973,11 @@ def write_matchup_from_dex_xyvieeee(dex_path, out_path, band="F814W"):
         xsig, ysig = float(row[4]), float(row[5])
         msig = float(row[6] if use_v else row[7])
         lv, li = float(row[12]), float(row[13])
+        detection_count = _matchup_detection_count(lv, li, band)
         out_lines.append(
-            _format_matchup_data_line(xbar, ybar, mbar, xsig, ysig, msig, lv, li, i)
+            _format_matchup_data_line(
+                xbar, ybar, mbar, xsig, ysig, msig, detection_count, i
+            )
         )
     out_path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
     return out_path
@@ -1328,7 +1989,8 @@ def write_cal_matchup_files(matchup_in, notfar_path, out_cal, out_cal_only, *, m
 
   Matches cal stars by position (same criterion as cal_star_num_2_MATCHUP).
   Falls back to the iMuref row index when the catalog was reordered after
-  NOTFAR was written, overlaying NOTFAR x/y on that row.
+  NOTFAR was written. MATCHUP bar coordinates are always preserved; NOTFAR
+  positions live in a different frame and must not overwrite them.
   """
     matchup_in = Path(matchup_in)
     notfar_path = Path(notfar_path)
@@ -1342,14 +2004,14 @@ def write_cal_matchup_files(matchup_in, notfar_path, out_cal, out_cal_only, *, m
     notfar = np.atleast_2d(np.loadtxt(notfar_path, skiprows=2))
     parsed = []
     for line in data_lines:
-        parts = line.split()
-        if len(parts) < 2:
+        fields = _parse_matchup_data_line(line)
+        if fields is None:
             parsed.append(None)
             continue
-        parsed.append({"x": float(parts[0]), "y": float(parts[1]), "line": line})
+        formatted = _matchup_line_from_fields(fields)
+        parsed.append({**fields, "line": formatted})
 
     cal_only_rows = []
-    out_data = []
     tol2 = match_tol ** 2
     for ic in range(notfar.shape[0]):
         x_ref, y_ref = float(notfar[ic, 0]), float(notfar[ic, 1])
@@ -1358,30 +2020,20 @@ def write_cal_matchup_files(matchup_in, notfar_path, out_cal, out_cal_only, *, m
         for j, rec in enumerate(parsed):
             if rec is None:
                 continue
-            dr2 = (rec["x"] - x_ref) ** 2 + (rec["y"] - y_ref) ** 2
+            dr2 = (rec["xbar"] - x_ref) ** 2 + (rec["ybar"] - y_ref) ** 2
             if dr2 < tol2:
                 hit = j
                 break
-        if hit is None and 1 <= i_muref <= len(parsed):
-            hit = i_muref - 1
-            rec = parsed[hit]
-            if rec is not None:
-                parts = rec["line"].split()
-                parts[0] = f"{x_ref:.4f}"
-                parts[1] = f"{y_ref:.4f}"
-                new_line = (
-                    f"{parts[0]:>11} {parts[1]:>11} " + " ".join(parts[2:])
-                )
-                parsed[hit] = {"x": x_ref, "y": y_ref, "line": new_line}
-
         if hit is None:
             continue
-        base = parsed[hit]["line"].rstrip()
-        annotated = f"{base}{ic + 1:7d}"
+        rec = parsed[hit]
+        if rec is None:
+            continue
+        annotated = _annotate_matchup_cal_line(rec["line"], ic + 1)
         parsed[hit]["line"] = annotated
-        mbar = annotated.split()[2]
+        mbar = rec["mbar"]
         cal_only_rows.append(
-            f"{x_ref:11.4f} {y_ref:11.4f} {float(mbar):11.4f}{ic + 1:8d}"
+            f"{rec['xbar']:11.4f} {rec['ybar']:11.4f} {float(mbar):11.4f}{ic + 1:7d}"
         )
 
     out_data = [rec["line"] if rec else "" for rec in parsed]
@@ -1397,21 +2049,35 @@ def ensure_matchup_catalogs_from_dex(directory):
     """
   Ensure 02.CMD contains MATCHUP.F814W.XYM.02 and MATCHUP.F606W.XYM.
 
-  Build them from dex_no_gaia_STEP08_A.xyvieeee (dex_no_gaia / 1exp_no_gaia output).
+  Prefer xym2bar catalogs from 01.XYM or the field root when they agree with
+  NOTFAR cal-star positions. Only build from dex_no_gaia_STEP08_A.xyvieeee as
+  a last resort (dex bar coordinates/magnitudes break VI_HST_ogle_man_match4).
   """
     root = Path(directory).resolve()
     cmd_dir = root / "02.CMD"
     cmd_dir.mkdir(parents=True, exist_ok=True)
     dex_path = resolve_dex_xyvieeee_path(directory)
 
+    notfar = None
+    for candidate in (
+        root / "07.CALIBRATION" / "NOTFAR_CAL_STARS.XYIVB_targ",
+        root / "04.EXTRACT_PSF" / "F814W" / "NOTFAR_CAL_STARS.XYIVB_targ",
+        root / "02.CMD" / "NOTFAR_CAL_STARS.XYIVB_targ",
+    ):
+        if candidate.is_file():
+            notfar = candidate
+            break
+
     f814 = cmd_dir / "MATCHUP.F814W.XYM.02"
     f606 = cmd_dir / "MATCHUP.F606W.XYM"
-    if not f814.is_file():
-        write_matchup_from_dex_xyvieeee(dex_path, f814, band="F814W")
-        print(f"Wrote {f814} from {dex_path}")
-    if not f606.is_file():
-        write_matchup_from_dex_xyvieeee(dex_path, f606, band="F606W")
-        print(f"Wrote {f606} from {dex_path}")
+    for band, dest in (("F814W", f814), ("F606W", f606)):
+        source, score = _resolve_matchup_catalog_source(directory, band, notfar)
+        if source is not None and source.resolve() != dest.resolve():
+            shutil.copy2(source, dest)
+            print(f"Using {source} for {dest.name} (NOTFAR match {score:.0%})")
+        if _matchup_needs_rebuild_from_dex(dest, dex_path, band, notfar_path=notfar):
+            write_matchup_from_dex_xyvieeee(dex_path, dest, band=band)
+            print(f"Wrote {dest} from {dex_path}")
     return f814, f606, dex_path
 
 
@@ -2362,16 +3028,16 @@ def calibration_new_matchup(directory):
     """
     Prepare 07.CALIBRATION matchup files for OGLE calibration.
 
-    Uses MATCHUP.F814W.XYM.02 / MATCHUP.F606W.XYM from 02.CMD when present.
-    Otherwise builds them from dex_no_gaia_STEP08_A.xyvieeee, then writes
-    MATCHUP.F814W_cal.XYM and MATCHUP.F814W_cal_only.XYM.
+    Keeps an existing bar-space MATCHUP catalog when present (6252/4738 anchor),
+    otherwise builds from 07.CALIBRATION/dex_no_gaia_STEP08_A.xyvieeee. Rows are
+    written in the 133-char xym2bar layout with exposure counts 1 (F814W) or 2
+    (F606W), then MATCHUP.F814W_cal.XYM is annotated from bar-space NOTFAR.
     """
     root = Path(directory).resolve()
     cal_dir = root / "07.CALIBRATION"
     cal_dir.mkdir(parents=True, exist_ok=True)
 
     for name in (
-        "NOTFAR_CAL_STARS.XYIVB_targ",
         "NEARBY_SIM_STARS.XYIVB_targ",
         "NEARBY_REF_STARS.XYIVB_targ",
     ):
@@ -2381,9 +3047,22 @@ def calibration_new_matchup(directory):
         if src.is_file():
             shutil.copy2(src, cal_dir / name)
 
-    f814_cmd, f606_cmd, _dex = ensure_matchup_catalogs_from_dex(directory)
-    shutil.copy2(f814_cmd, cal_dir / "MATCHUP.F814W.XYM.02")
-    shutil.copy2(f606_cmd, cal_dir / "MATCHUP.F606W.XYM")
+    dex_path = cal_dir / "dex_no_gaia_STEP08_A.xyvieeee"
+    if not dex_path.is_file():
+        dex_path = resolve_dex_xyvieeee_path(directory)
+        shutil.copy2(dex_path, cal_dir / "dex_no_gaia_STEP08_A.xyvieeee")
+        dex_path = cal_dir / "dex_no_gaia_STEP08_A.xyvieeee"
+
+    f814 = cal_dir / "MATCHUP.F814W.XYM.02"
+    f606 = cal_dir / "MATCHUP.F606W.XYM"
+    if f814.is_file() and _matchup_has_bar_anchor(f814):
+        _reformat_matchup_exposure_inplace(f814, 1)
+        _reformat_matchup_exposure_inplace(f606, 2)
+        print(f"Reformatted exposure counts on existing {f814} and {f606}")
+    else:
+        write_matchup_from_dex_xyvieeee(dex_path, f814, band="F814W")
+        write_matchup_from_dex_xyvieeee(dex_path, f606, band="F606W")
+        print(f"Wrote {f814} and {f606} from {dex_path}")
 
     loc_trans = root / "03.LOC_TRANS" / "outputq.fits"
     if loc_trans.is_file():
@@ -2397,19 +3076,18 @@ def calibration_new_matchup(directory):
                 shutil.copy2(alt, cal_dir / "outputq.fits")
                 break
 
-    notfar = cal_dir / "NOTFAR_CAL_STARS.XYIVB_targ"
-    if not notfar.is_file():
-        raise FileNotFoundError(
-            f"NOTFAR_CAL_STARS.XYIVB_targ not found under {cal_dir} or 04.EXTRACT_PSF/F814W"
-        )
-
+    notfar = _resolve_calibration_notfar(
+        directory, cal_dir, f814_matchup=f814
+    )
     write_cal_matchup_files(
-        cal_dir / "MATCHUP.F814W.XYM.02",
+        f814,
         notfar,
         cal_dir / "MATCHUP.F814W_cal.XYM",
         cal_dir / "MATCHUP.F814W_cal_only.XYM",
     )
     print("Wrote MATCHUP.F814W_cal.XYM and MATCHUP.F814W_cal_only.XYM")
+
+    _ensure_psf_mcmc_fit_sky(directory)
 
     def psf_star_mags_mcmc(directory, script='run_psf_star_Imags_mcmc.src'):
         
@@ -2492,39 +3170,8 @@ def calibration_hst_ogle_match(directory):
         return
 
     VI_HST_ogle_man_match4(directory)
-
-
-def fix_vi_hst_ogle_cal_matches4_spacing(directory):
-    """
-    VI_HST_ogle_man_match4 writes Vo-Vhfs (f9.4) and lg_c2Vmx (f8.3) adjacent.
-    Insert the missing space so fit_HST_IV_ogle_col can parse the file.
-    """
-    file_path = Path(directory).resolve() / "07.CALIBRATION" / "VI_HST_ogle_Cal_matches4.dat"
-    if not file_path.exists():
-        return
-
-    # f9.4 field ending in four decimals, immediately followed by a negative f8.3.
-    boundary = re.compile(r"\.\d{4}-")
-    out_lines = []
-    for line in file_path.read_text(encoding="utf-8").splitlines():
-        if not line.strip() or line.startswith("#"):
-            out_lines.append(line)
-            continue
-        if len(line.split()) >= 23:
-            out_lines.append(line)
-            continue
-        matches = list(boundary.finditer(line))
-        if len(matches) >= 2:
-            idx = matches[1].end() - 1
-        elif matches:
-            idx = matches[0].end() - 1
-        else:
-            out_lines.append(line)
-            continue
-        line = line[:idx] + " " + line[idx:]
-        out_lines.append(line)
-
-    file_path.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+    fix_vi_hst_ogle_cal_matches4_spacing(directory)
+    expand_vi_hst_cal_matches_for_fit(directory, min_stars=15, max_stars=20)
 
 
 def fit_calibration(directory):

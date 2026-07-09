@@ -1,7 +1,7 @@
        program VI_HST_ogle_man_match4
 
        IMPLICIT DOUBLE PRECISION (A-H,O-Z)
-       parameter(maxstars=30000,nbmax=100,Nfs=100)
+       parameter(maxstars=100000,nbmax=100,Nfs=100)
        real*8 x(maxstars),xe(maxstars),y(maxstars),ye(maxstars)
        real*8 x0(maxstars),y0(maxstars)
        real*8 xe0(maxstars),ye0(maxstars)
@@ -133,9 +133,12 @@ ccc           read(inline(12:lin),*) chi2_I(kstar)
          elseif(inline(1:11).eq.'#  A1_min =') then
            read(inline(12:lin),*) A1I(kstar)
            Imag_fsky(kstar) = -2.5d0*log10(A1I(kstar))
-ccc           lg_chi2_Imx = log10(chi2_I(kstar)) + 0.25*Imag_fsky(kstar)
-           lg_chi2_Imx(kstar) = log10(chi2_I(kstar))
-     &                        + 0.25d0*Imag_fsky(kstar)
+           if(chi2_I(kstar).gt.0.d0) then
+             lg_chi2_Imx(kstar) = log10(chi2_I(kstar))
+     &                          + 0.25d0*Imag_fsky(kstar)
+           else
+             lg_chi2_Imx(kstar) = 99.999d0
+           endif
          endif
        enddo
  3     continue
@@ -150,18 +153,21 @@ ccc           lg_chi2_Imx = log10(chi2_I(kstar)) + 0.25*Imag_fsky(kstar)
            if(kstar.gt.Nfs) stop 'kstar_V > Nfs'
          elseif(inline(1:11).eq.'# chi2MIN =') then
            if (index(inline(12:lin), '*') == 0) then
-            read(inline(12:lin), *) chi2_I(kstar)
+            read(inline(12:lin), *) chi2_V(kstar)
            else
-            print *, "Overflow detected, setting chi2_I(", kstar, 
+            print *, "Overflow detected, setting chi2_V(", kstar, 
      &        ") to -1.0"
-            chi2_I(kstar) = -1.0
+            chi2_V(kstar) = -1.0
            endif
-ccc           read(inline(12:lin),*) chi2_V(kstar)
          elseif(inline(1:11).eq.'#  A1_min =') then
            read(inline(12:lin),*) A1V(kstar)
            Vmag_fsky(kstar) = -2.5d0*log10(A1V(kstar))
-           lg_chi2_Vmx(kstar) = log10(chi2_V(kstar))
-     &                        + 0.25d0*Vmag_fsky(kstar)
+           if(chi2_V(kstar).gt.0.d0) then
+             lg_chi2_Vmx(kstar) = log10(chi2_V(kstar))
+     &                          + 0.25d0*Vmag_fsky(kstar)
+           else
+             lg_chi2_Vmx(kstar) = 99.999d0
+           endif
          endif
        enddo
  4     continue
@@ -285,7 +291,12 @@ c      SEAN NOTE: The comment about columns names above is out-dated, inconsiste
 c      MATCHUP.XYM formatting. I need to make a modification to account for older format.
        nf = 0
        ncal = 0
-       do i=1,99999
+       do i=1,999999
+         if(i.gt.maxstars) then
+           write(6,*) 'ERROR: MATCHUP star count exceeds maxstars=',
+     &                maxstars
+           stop
+         endif
          read(2,'(a)',err=31,end=31) inline
          read(3,'(a)',err=31,end=31) inline2
          if(inline(1:1).ne.'#') then
